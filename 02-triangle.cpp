@@ -1,7 +1,9 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <fstream>
 #include <sstream>
+#include <vector>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -15,10 +17,17 @@
 
 constexpr GLuint WIDTH = 800, HEIGHT = 600;
 
+#define SHADER_PATH "./shaders/"
+
+constexpr char *vertFile= SHADER_PATH "02.vert";
+constexpr char *fragFile= SHADER_PATH "02.frag";
+
+
 class Hello
 {
 
     GLFWwindow *window;
+    GLuint programId;
 
     void initWindow()
     {
@@ -48,7 +57,11 @@ class Hello
             throw std::runtime_error("failed to load glad");
 
         listGLInfo();
+
+#ifndef NODEBUG
         EnableDebugOutput();
+#endif
+        createTestProgram();
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.f);
     }
@@ -69,6 +82,8 @@ class Hello
     void drawFrame()
     {
         glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(programId);
+        glDrawArrays(GL_TRIANGLE_STRIP,0,3);
     }
 
     void listGLInfo()
@@ -243,6 +258,71 @@ class Hello
             break;
         }
         LOG(sstr.str());
+    }
+
+    std::string readFile(const char *filename)
+    {
+        std::fstream file(filename, std::ios::in | std::ios::ate | std::ios::binary);
+        if (!file.is_open())
+            throw std::runtime_error("failed to open file");
+        size_t size0 = static_cast<size_t>(file.tellg());
+        std::string ret;
+        ret.resize(size0);
+        file.seekg(0);
+        file.read(const_cast<char *>(ret.data()), size0);
+        file.close();
+        return ret;
+    }
+
+    GLuint createShader(GLenum shaderType, const GLchar *code)
+    {
+        auto id = glCreateShader(shaderType);
+        glShaderSource(id, 1, &code, NULL);
+        glCompileShader(id);
+
+#ifndef NODEBUG
+        GLint success;
+        glGetShaderiv(id, GL_COMPILE_STATUS, &success);
+        if (!success)
+        {
+            GLint len;
+            glGetShaderiv(id, GL_INFO_LOG_LENGTH, &len);
+            std::string log;
+            log.resize(static_cast<size_t>(len));
+            glGetShaderInfoLog(id, len, NULL, &log[0]);
+            LOG(log);
+        }
+#endif
+        return id;
+    }
+    GLuint createProgram(const std::vector<GLuint> &shaders)
+    {
+        auto id = glCreateProgram();
+        for (auto shader : shaders)
+            glAttachShader(id, shader);
+        glLinkProgram(id);
+#ifndef NODEBUG
+        GLint success;
+        glGetProgramiv(id, GL_COMPILE_STATUS, &success);
+        if (!success)
+        {
+            GLint len;
+            glGetProgramiv(id, GL_INFO_LOG_LENGTH, &len);
+            std::string log;
+            log.resize(static_cast<size_t>(len));
+            glGetProgramInfoLog(id, len, NULL, &log[0]);
+            LOG(log);
+        }
+#endif
+        return id;
+    }
+    void createTestProgram()
+    {
+        auto vertCode=readFile(vertFile);
+        auto fragCode=readFile(fragFile);
+        auto vertId=createShader(GL_VERTEX_SHADER,vertCode.data());
+        auto fragId = createShader(GL_FRAGMENT_SHADER, fragCode.data());
+        programId = createProgram({vertId, fragId});
     }
 
 public:
