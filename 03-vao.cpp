@@ -460,15 +460,15 @@ class Hello
         programId = createProgram({vertId, fragId});
     }
 
-    GLuint createBuffer(GLenum target, GLsizeiptr size, void *data, GLenum usage)
+    GLuint createBuffer(GLenum target, GLsizeiptr size, void *data, GLbitfield flags)
     {
         GLuint buffer;
         glGenBuffers(1, &buffer);
         glBindBuffer(target, buffer);
-        //if (glVersion < 44)
-        glBufferData(target, size, data, usage);
-        //else
-        //    glBufferStorage(target, size, data, 0);
+        if (glVersion < 44)
+            glBufferData(target, size, data, GL_DYNAMIC_DRAW);
+        else
+            glBufferStorage(target, size, data, flags);
         glBindBuffer(target, 0);
         return buffer;
     }
@@ -478,7 +478,7 @@ class Hello
     }
     void createVertexBuffer()
     {
-        vertexBuffer = createBuffer(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(vertices[0])), vertices.data(), GL_STATIC_DRAW);
+        vertexBuffer = createBuffer(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(vertices[0])), vertices.data(), 0);
     }
     GLuint createVAO(const std::vector<GLuint> &buffers, const VertexInputStateDescription &vertexInputDescription)
     {
