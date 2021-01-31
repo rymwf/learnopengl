@@ -1,20 +1,16 @@
-#include <exception>
-#include <iostream>
-
-#include <GLFW/glfw3.h>
-
-#ifdef NDEBUG
-#define LOG(str)
-#else
-#define LOG(str) \
-    std::cout << __FILE__ << " " << __LINE__ << ":  " << #str << ": " << str << std::endl
-#endif
-
-constexpr GLuint WIDTH = 800, HEIGHT = 600;
+/**
+ * @file 00.cpp
+ * @author yangzs
+ * @brief 
+ * @version 0.1
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ */
+#include "common.h"
 
 class Hello
 {
-
     GLFWwindow *window;
 
     void initWindow()
