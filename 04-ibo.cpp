@@ -25,8 +25,8 @@ std::vector<Vertex> vertices{
 std::vector<uint32_t> indices{
 	0, 1, 2, 2, 1, 3};
 
-DrawIndirectCommand drawIndirectCmd{4, 1, 0, 0};
-DrawIndexedIndirectCommand drawIndexedIndirectCmd{6, 1, 0, 0, 0};
+std::vector<DrawIndirectCommand> drawIndirectCmds{{4, 1, 0, 0}};
+std::vector<DrawIndexedIndirectCommand> drawIndexedIndirectCmds{{6, 1, 0, 0, 0}};
 
 class Hello
 {
@@ -41,7 +41,9 @@ class Hello
 	BufferHandle vertexBuffer;
 	BufferHandle indexBuffer;
 	BufferHandle drawIndirectCmdBuffer;
+	BufferHandle drawIndirectCmdCountBuffer;
 	BufferHandle drawIndexedIndirectCmdBuffer;
+	BufferHandle drawIndexedIndirectCmdCountBuffer;
 
 	void initWindow()
 	{
@@ -100,7 +102,9 @@ class Hello
 	}
 	void cleanup()
 	{
+		glDeleteBuffers(1, &drawIndexedIndirectCmdCountBuffer);
 		glDeleteBuffers(1, &drawIndexedIndirectCmdBuffer);
+		glDeleteBuffers(1, &drawIndirectCmdCountBuffer);
 		glDeleteBuffers(1, &drawIndirectCmdBuffer);
 		glDeleteBuffers(1, &vertexBuffer);
 		glDeleteBuffers(1, &indexBuffer);
@@ -126,12 +130,67 @@ class Hello
 		//glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
 		//glDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL);
 		//4
-		//glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
+		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+		//		if(GLVersion.major*10+GLVersion.minor>=43)
+		//		{
+		//			glMultiDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
+		//		}else{
+		//#ifdef GL_AMD_multi_draw_indirect
+		//			glMultiDrawArraysIndirectAMD(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
+		//#endif
+		//		}
 		//5
+		//		if (GLVersion.major * 10 + GLVersion.minor >= 46)
+		//		{
+		//			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+		//			glBindBuffer(GL_PARAMETER_BUFFER, drawIndirectCmdCountBuffer);
+		//			glMultiDrawArraysIndirectCount(GL_TRIANGLE_STRIP, NULL, 0, drawIndirectCmds.size(), sizeof(DrawIndirectCommand)); //disgusting
+		//		}
+		//		else
+		//		{
+		//#ifdef GL_ARB_indirect_parameters
+		//			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+		//			glBindBuffer(GL_PARAMETER_BUFFER_ARB, drawIndirectCmdCountBuffer);
+		//			glMultiDrawArraysIndirectCountARB(GL_TRIANGLE_STRIP, NULL, 0, drawIndirectCmds.size(), sizeof(DrawIndirectCommand)); //disgusting
+		//#endif
+		//		}
+
+		//draw index
+
+		//1
+		//glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
+		//2
 		//glDrawElementsIndirect(GL_TRIANGLES,GL_UNSIGNED_INT,&drawIndexedIndirectCmd);
-		//6
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
-		glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, NULL);
+		//3
+		//glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
+		//glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, NULL);
+		//4
+		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
+		//		if (GLVersion.major * 10 + GLVersion.minor >= 43)
+		//		{
+		//			glMultiDrawElementsIndirect(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
+		//		}
+		//		else
+		//		{
+		//#ifdef GL_AMD_multi_draw_indirect
+		//			glMultiDrawElementsIndirectAMD(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
+		//#endif
+		//		}
+		//5
+		if (GLVersion.major * 10 + GLVersion.minor >= 46)
+		{
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
+			glBindBuffer(GL_PARAMETER_BUFFER, drawIndexedIndirectCmdCountBuffer);
+			glMultiDrawElementsIndirectCount(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
+		}
+		else
+		{
+#ifdef GL_ARB_indirect_parameters
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
+			glBindBuffer(GL_PARAMETER_BUFFER, drawIndexedIndirectCmdCountBuffer);
+			glMultiDrawElementsIndirectCountARB(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
+#endif
+		}
 	}
 
 	void resize()
@@ -228,8 +287,13 @@ class Hello
 
 	void createDrawCommandBuffer()
 	{
-		createBuffer({sizeof(DrawIndirectCommand), &drawIndirectCmd}, &drawIndirectCmdBuffer);
-		createBuffer({sizeof(DrawIndexedIndirectCommand), &drawIndexedIndirectCmd}, &drawIndexedIndirectCmdBuffer);
+		createBuffer({sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size(), drawIndirectCmds.data()}, &drawIndirectCmdBuffer);
+		uint32_t count = drawIndirectCmds.size();
+		createBuffer({4, &count}, &drawIndirectCmdCountBuffer);
+
+		createBuffer({sizeof(drawIndexedIndirectCmds[0]) * drawIndexedIndirectCmds.size(), drawIndexedIndirectCmds.data()}, &drawIndexedIndirectCmdBuffer);
+		count = drawIndexedIndirectCmds.size();
+		createBuffer({4, &count}, &drawIndexedIndirectCmdCountBuffer);
 	}
 
 public:

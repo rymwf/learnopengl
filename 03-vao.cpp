@@ -23,7 +23,7 @@ std::vector<Vertex> vertices{
 	{{0.5, 0.5, 0}, {1, 1, 0}},
 };
 
-DrawIndirectCommand drawIndirectCmd{4, 1, 0, 0};
+std::vector<DrawIndirectCommand> drawIndirectCmds{{4, 1, 0, 0}};
 
 class Hello
 {
@@ -37,6 +37,7 @@ class Hello
 	VertexArrayHandle vertexArray;
 	BufferHandle vertexBuffer;
 	BufferHandle drawIndirectCmdBuffer;
+	BufferHandle drawIndirectCmdCountBuffer;
 
 	void initWindow()
 	{
@@ -94,6 +95,7 @@ class Hello
 	}
 	void cleanup()
 	{
+		glDeleteBuffers(1, &drawIndirectCmdCountBuffer);
 		glDeleteBuffers(1, &drawIndirectCmdBuffer);
 		glDeleteBuffers(1, &vertexBuffer);
 		glDeleteVertexArrays(1, &vertexArray);
@@ -110,13 +112,39 @@ class Hello
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
-		
+
+		//1
 		//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
+		//2
 		//glDrawArraysIndirect(GL_TRIANGLE_STRIP, &drawIndirectCmd);
-
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
-		glDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL);
+		//3
+		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+		//		glDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL);
+		//4
+		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+		//		if(GLVersion.major*10+GLVersion.minor>=43)
+		//		{
+		//			glMultiDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
+		//		}else{
+		//#ifdef GL_AMD_multi_draw_indirect
+		//			glMultiDrawArraysIndirectAMD(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
+		//#endif
+		//		}
+		//5
+		if (GLVersion.major * 10 + GLVersion.minor >= 46)
+		{
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+			glBindBuffer(GL_PARAMETER_BUFFER, drawIndirectCmdCountBuffer);
+			glMultiDrawArraysIndirectCount(GL_TRIANGLE_STRIP, NULL, 0, drawIndirectCmds.size(), sizeof(DrawIndirectCommand)); //disgusting
+		}
+		else
+		{
+#ifdef GL_ARB_indirect_parameters
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+			glBindBuffer(GL_PARAMETER_BUFFER_ARB, drawIndirectCmdCountBuffer);
+			glMultiDrawArraysIndirectCountARB(GL_TRIANGLE_STRIP, NULL, 0, drawIndirectCmds.size(), sizeof(DrawIndirectCommand)); //disgusting
+#endif
+		}
 	}
 
 	void resize()
@@ -208,7 +236,9 @@ class Hello
 	}
 	void createDrawCommandBuffer()
 	{
-		createBuffer({sizeof(DrawIndirectCommand), &drawIndirectCmd}, &drawIndirectCmdBuffer);
+		createBuffer({sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size(), drawIndirectCmds.data()}, &drawIndirectCmdBuffer);
+		uint32_t count = drawIndirectCmds.size();
+		createBuffer({4, &count}, &drawIndirectCmdCountBuffer);
 	}
 
 public:
