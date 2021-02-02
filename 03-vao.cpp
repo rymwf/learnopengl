@@ -9,6 +9,8 @@
  */
 #include "common.h"
 
+constexpr GLuint WIDTH = 800, HEIGHT = 600;
+
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
 constexpr char *vertFile = SHADER_PATH "03.vert";
@@ -21,6 +23,8 @@ std::vector<Vertex> vertices{
 	{{0.5, 0.5, 0}, {1, 1, 0}},
 };
 
+DrawIndirectCommand drawIndirectCmd{4, 1, 0, 0};
+
 class Hello
 {
 
@@ -32,6 +36,7 @@ class Hello
 	ProgramHandle programId;
 	VertexArrayHandle vertexArray;
 	BufferHandle vertexBuffer;
+	BufferHandle drawIndirectCmdBuffer;
 
 	void initWindow()
 	{
@@ -76,6 +81,7 @@ class Hello
 		createTestProgram();
 		createVertexBuffer();
 		createVAO();
+		createDrawCommandBuffer();
 	}
 	void mainLoop()
 	{
@@ -88,6 +94,7 @@ class Hello
 	}
 	void cleanup()
 	{
+		glDeleteBuffers(1, &drawIndirectCmdBuffer);
 		glDeleteBuffers(1, &vertexBuffer);
 		glDeleteVertexArrays(1, &vertexArray);
 		glDeleteShader(vertShader);
@@ -103,7 +110,13 @@ class Hello
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		
+		//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+		//glDrawArraysIndirect(GL_TRIANGLE_STRIP, &drawIndirectCmd);
+
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+		glDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL);
 	}
 
 	void resize()
@@ -191,7 +204,11 @@ class Hello
 			attributeDescriptions.size(),
 			attributeDescriptions.data(),
 		};
-		createVertexArray(vertexInputStateDescription, {vertexBuffer}, &vertexArray);
+		createVertexArray(vertexInputStateDescription, {vertexBuffer}, 0, &vertexArray);
+	}
+	void createDrawCommandBuffer()
+	{
+		createBuffer({sizeof(DrawIndirectCommand), &drawIndirectCmd}, &drawIndirectCmdBuffer);
 	}
 
 public:

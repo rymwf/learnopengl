@@ -9,6 +9,8 @@
  */
 #include "common.h"
 
+constexpr GLuint WIDTH = 800, HEIGHT = 600;
+
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
 class Hello

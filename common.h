@@ -35,13 +35,28 @@
 	std::cout << __FILE__ << " " << __LINE__ << ":  " << #str << ": " << str << std::endl
 #endif
 
-constexpr GLuint WIDTH = 800, HEIGHT = 600;
-
 typedef uint32_t ShaderHandle;
 typedef uint32_t ProgramHandle;
 typedef uint32_t PipelineHandle;
 typedef uint32_t BufferHandle;
-typedef uint32_t VertexArrayHandle;
+typedef uint32_t VertexArrayHandle; 
+
+struct DrawIndirectCommand
+{
+	uint32_t vertexCount;
+	uint32_t instanceCount;
+	uint32_t firstVertex;
+	uint32_t firstInstance;
+};
+
+struct DrawIndexedIndirectCommand
+{
+	uint32_t indexCount;
+	uint32_t instanceCount;
+	uint32_t firstIndex;
+	int32_t vertexOffset;
+	uint32_t firstInstance;
+};
 
 struct BufferCreateInfo
 {
@@ -99,9 +114,9 @@ struct VertexBindingDescription
 
 struct VertexInputStateDescription
 {
-	uint32_t vertexBindingDescriptionsCount;
+	uint32_t vertexBindingDescriptionCount;
 	const VertexBindingDescription *pVertexBindingDescriptions;
-	uint32_t vertexAttributeDescriptionsCount;
+	uint32_t vertexAttributeDescriptionCount;
 	const VertexAttributeDescription *pVertexAttributeDescriptions;
 };
 
@@ -170,6 +185,15 @@ void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, Pipeli
 
 void createBuffer(const BufferCreateInfo &createInfo, BufferHandle *pBuffer);
 
+/**
+ * @brief Create a Vertex Array object
+ * 
+ * @param vertexInputDescription 
+ * @param vertexBuffers 
+ * @param indexBuffer  if indexBuffer is 0, then should call draw index
+ * @param pVertexArray 
+ */
 void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
-					   const std::vector<BufferHandle> &buffers,
+					   const std::vector<BufferHandle> &vertexBuffers,
+					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray);

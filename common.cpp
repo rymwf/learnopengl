@@ -136,10 +136,10 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id,
 void listGLInfo()
 {
 	// check opengl informations
-	LOG(glGetString(GL_VENDOR));
-	LOG(glGetString(GL_RENDERER));
-	LOG(glGetString(GL_VERSION));
-	LOG(glGetString(GL_SHADING_LANGUAGE_VERSION));
+	LOG_VAR(glGetString(GL_VENDOR));
+	LOG_VAR(glGetString(GL_RENDERER));
+	LOG_VAR(glGetString(GL_VERSION));
+	LOG_VAR(glGetString(GL_SHADING_LANGUAGE_VERSION));
 
 	// extensions
 #if 0
@@ -300,7 +300,7 @@ bool isSupportShaderBinaryFormat(ShaderBinaryFormat format)
 	auto shaderBinaryFormats = getSupportedShaderBinaryFormat();
 	for (auto &shaderBinaryFormat : shaderBinaryFormats)
 	{
-		LOG(shaderBinaryFormat);
+		LOG_VAR(shaderBinaryFormat);
 		if (static_cast<GLenum>(shaderBinaryFormat) == Map(format))
 			return true;
 	}
@@ -439,24 +439,27 @@ void createBuffer(const BufferCreateInfo &createInfo, BufferHandle *pBuffer)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
-					   const std::vector<BufferHandle> &buffers,
+					   const std::vector<BufferHandle> &vertexBuffers,
+					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray)
 {
-	std::vector<std::pair<int, int>> bindingDescriptions(vertexInputDescription.vertexBindingDescriptionsCount);
+	std::vector<std::pair<int, int>> bindingDescriptions(vertexInputDescription.vertexBindingDescriptionCount);
 
-	for (uint32_t i = 0; i < vertexInputDescription.vertexBindingDescriptionsCount; ++i)
+	for (uint32_t i = 0; i < vertexInputDescription.vertexBindingDescriptionCount; ++i)
 	{
 		const auto &e = vertexInputDescription.pVertexBindingDescriptions[i];
 		bindingDescriptions[e.binding] = {e.stride, e.divisor};
 	}
 
 	glGenVertexArrays(1, pVertexArray);
+	if (*pVertexArray == 0)
+		throw std::runtime_error("failed to create vertex array object");
 	glBindVertexArray(*pVertexArray);
 
-	for (uint32_t i = 0; i < vertexInputDescription.vertexAttributeDescriptionsCount; ++i)
+	for (uint32_t i = 0; i < vertexInputDescription.vertexAttributeDescriptionCount; ++i)
 	{
 		const auto &attrib = vertexInputDescription.pVertexAttributeDescriptions[i];
-		glBindBuffer(GL_ARRAY_BUFFER, buffers[attrib.binding]);
+		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffers[attrib.binding]);
 		glEnableVertexAttribArray(attrib.location);
 		glVertexAttribPointer(
 			attrib.location, attrib.components,
@@ -465,4 +468,6 @@ void createVertexArray(const VertexInputStateDescription &vertexInputDescription
 			(void *)attrib.offset);
 		glVertexAttribDivisor(attrib.location, bindingDescriptions[attrib.binding].second);
 	}
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+	glBindVertexArray(0);
 }
