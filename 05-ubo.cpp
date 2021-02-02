@@ -48,8 +48,14 @@ std::vector<DrawIndexedIndirectCommand> drawIndexedIndirectCmds{{6, 1, 0, 0, 0}}
 class Hello
 {
 
+	uint32_t FPS;
+	float frameTimeInterval_ms;
+	std::chrono::system_clock::time_point curTime;
+	std::chrono::system_clock::time_point startTime;
+
 	GLFWwindow *window;
 	bool framebufferResized{true};
+
 	ShaderHandle vertShader;
 	ShaderHandle fragShader;
 	ProgramHandle programId;
@@ -64,6 +70,7 @@ class Hello
 
 	void initWindow()
 	{
+		startTime = std::chrono::system_clock::now();
 		glfwInit();
 
 		//set gl versiont
@@ -113,6 +120,11 @@ class Hello
 	{
 		while (!glfwWindowShouldClose(window))
 		{
+			auto temptime = std::chrono::system_clock::now();
+			frameTimeInterval_ms = std::chrono::duration<float, std::chrono::milliseconds::period>(temptime - curTime).count();
+			curTime = temptime;
+			FPS = static_cast<uint32_t>(1000 / frameTimeInterval_ms);
+
 			glfwPollEvents();
 			drawFrame();
 			glfwSwapBuffers(window);
@@ -141,7 +153,7 @@ class Hello
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
-		//glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
+		updateUboBuffers();
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
 		//1
 		//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -346,8 +358,14 @@ class Hello
 	}
 	void updateUboBuffers()
 	{
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
+		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
+
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMVPBuffer, 0, sizeof(glm::mat4));
-		//        void* data=glMapBufferRange(GL_UNIFORM_BUFFER,0,sizeof(glm::mat4),GL_MAP_WRITE_BIT|GL_MAP_COHERENT_BIT|);
+		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), 
+		GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT | GL_MAP_PERSISTENT_BIT|GL_MAP_UNSYNCHRONIZED_BIT);
+		memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
+		glUnmapBuffer(GL_UNIFORM_BUFFER);
 	}
 
 public:
