@@ -110,10 +110,6 @@ GLenum Map(BufferBindTarget target)
 {
 	return glBufferBindTargetArray[static_cast<size_t>(target)];
 }
-//GLenum Map(ShaderStage shaderStage)
-//{
-//    return glShaderStageArray[static_cast<size_t>(shaderStage)];
-//}
 GLenum Map(ShaderBinaryFormat shaderBinaryFormat)
 {
 	return glShaderBinaryFormatArray[static_cast<size_t>(shaderBinaryFormat)];

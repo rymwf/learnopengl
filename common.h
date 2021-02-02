@@ -27,8 +27,11 @@
 
 #ifdef NDEBUG
 #define LOG(str)
+#define LOG_VAR(str)
 #else
 #define LOG(str) \
+	std::cout << __FILE__ << " " << __LINE__ << ":  " << str << std::endl
+#define LOG_VAR(str) \
 	std::cout << __FILE__ << " " << __LINE__ << ":  " << #str << ": " << str << std::endl
 #endif
 
@@ -43,6 +46,8 @@ typedef uint32_t VertexArrayHandle;
 struct BufferCreateInfo
 {
 	size_t size;
+	const void *pData;
+	BufferStorageFlags storageFlags;
 };
 
 struct SpecializationInfo
@@ -58,12 +63,6 @@ struct PipelineShaderStageCreateInfo
 	ShaderHandle shaderHandle;
 	const char *pEntryName;
 	const SpecializationInfo *pSecializationInfo;
-};
-
-struct GraphicsPipelineCreateInfo
-{
-	uint32_t stageCount;
-	const PipelineShaderStageCreateInfo *pStages;
 };
 
 struct ShaderCreateInfo
@@ -100,8 +99,16 @@ struct VertexBindingDescription
 
 struct VertexInputStateDescription
 {
-	std::vector<VertexBindingDescription> vertexBindingDescriptions;
-	std::vector<VertexAttributeDescription> vertexAttributeDescriptions;
+	uint32_t vertexBindingDescriptionsCount;
+	const VertexBindingDescription *pVertexBindingDescriptions;
+	uint32_t vertexAttributeDescriptionsCount;
+	const VertexAttributeDescription *pVertexAttributeDescriptions;
+};
+
+struct GraphicsPipelineCreateInfo
+{
+	uint32_t stageCount;
+	const PipelineShaderStageCreateInfo *pStages;
 };
 
 struct Vertex
@@ -160,3 +167,9 @@ void createShader(const ShaderCreateInfo &createInfo, ShaderHandle *pShader);
 void createShaderBinary(const ShaderCreateInfo &createInfo, ShaderHandle *pShader);
 void createProgram(const ProgramCreateInfo &createInfo, ProgramHandle *pProgram);
 void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline, ProgramHandle *pPrograms);
+
+void createBuffer(const BufferCreateInfo &createInfo, BufferHandle *pBuffer);
+
+void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
+					   const std::vector<BufferHandle> &buffers,
+					   VertexArrayHandle *pVertexArray);

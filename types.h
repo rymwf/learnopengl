@@ -43,6 +43,7 @@ enum ShaderStageFlagBits
 	SHADER_STAGE_COMPUTE_BIT = 0x00000020,
 	SHADER_STAGE_ALL_BITS = 0xFFFFFFFF,
 };
+using ShaderStageFlags = Flags;
 
 enum ProgramInterface
 {
@@ -96,6 +97,7 @@ enum BufferStorageFlagBits
 	BUFFER_STORAGE_DYNAMIC_STORAGE_BIT = 0x100,
 	BUFFER_STORAGE_CLIENT_STORAGE_BIT = 0x200,
 };
+using BufferStorageFlags=Flags;
 
 enum BufferMapFlagBits
 {
@@ -108,6 +110,7 @@ enum BufferMapFlagBits
 	BUFFER_MAP_PERSISTENT_BIT = 0x40,
 	BUFFER_MAP_COHERENT_BIT = 0x80,
 };
+using BufferMapFlags=Flags;
 
 enum MemoryBarrierFlagBits
 {
@@ -128,6 +131,7 @@ enum MemoryBarrierFlagBits
 	MEMORY_BARRIER_QUERY_BUFFER_BIT = 0x00008000,
 	MEMORY_BARRIER_ALL_BITS = 0xFFFFFFFF,
 };
+using MemoryBarrierFlags=Flags;
 
 GLenum Map(DataType dataType);
 GLenum Map(BufferBindTarget target);

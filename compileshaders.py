@@ -6,6 +6,8 @@ PATH_SHADER = "./shaders"
 PATH_SHADER_COMPILE_DST = "./shaders"
 
 def compileShader(filename):
+    if os.path.splitext(filename)[1] == ".spv":
+        return
     os.system('cmd /c "glslc ' + filename + " -o " +
               PATH_SHADER_COMPILE_DST+"/"+os.path.basename(filename)+".spv" + '" --target-env=opengl')
 

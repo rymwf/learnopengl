@@ -17,18 +17,21 @@ void EnableDebugOutput(const void *userParam)
 	if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
 	{
 		glEnable(GL_DEBUG_OUTPUT);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); // makes sure errors are displayed synchronously
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); // makes sure errors are displayed
+											   // synchronously
 
 		if (GLVersion.major * 10 + GLVersion.minor >= 43)
 		{
 			glDebugMessageCallback(DebugOutputCallback, userParam);
-			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0,
+								  NULL, GL_TRUE);
 		}
 		else
 		{
 #ifdef GL_ARB_debug_output
 			glDebugMessageCallbackARB(DebugOutputCallback, userParam);
-			glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+			glDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0,
+									 NULL, GL_TRUE);
 #else
 			LOG("current opengl version do not support debug output");
 #endif
@@ -40,17 +43,16 @@ void EnableDebugOutput(const void *userParam)
 	}
 }
 
-void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
+void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id,
+								  GLenum severity, GLsizei length,
+								  const GLchar *message,
+								  const void *userParam)
 {
 	if (id == 131169 || id == 131185 || id == 131218 || id == 131204)
 		return; // ignore these non-significant error codes
 	std::stringstream sstr;
-	sstr
-		<< "Debug message id:" << id
-		<< " length:" << length
-		<< " useParam:" << userParam
-		<< " message:" << message
-		<< "\n";
+	sstr << "Debug message id:" << id << " length:" << length
+		 << " useParam:" << userParam << " message:" << message << "\n";
 	//		LOG_DEBUG(":{}, message:{}", id, message);
 	switch (source)
 	{
@@ -58,16 +60,20 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum 
 		sstr << "Source: API :0x" << std::hex << GL_DEBUG_SOURCE_API;
 		break;
 	case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
-		sstr << "Source: Window System :0x" << std::hex << GL_DEBUG_SOURCE_WINDOW_SYSTEM;
+		sstr << "Source: Window System :0x" << std::hex
+			 << GL_DEBUG_SOURCE_WINDOW_SYSTEM;
 		break;
 	case GL_DEBUG_SOURCE_SHADER_COMPILER:
-		sstr << "Source: Shader Compiler :0x" << std::hex << GL_DEBUG_SOURCE_SHADER_COMPILER;
+		sstr << "Source: Shader Compiler :0x" << std::hex
+			 << GL_DEBUG_SOURCE_SHADER_COMPILER;
 		break;
 	case GL_DEBUG_SOURCE_THIRD_PARTY:
-		sstr << "Source: Third Party :0x" << std::hex << GL_DEBUG_SOURCE_THIRD_PARTY;
+		sstr << "Source: Third Party :0x" << std::hex
+			 << GL_DEBUG_SOURCE_THIRD_PARTY;
 		break;
 	case GL_DEBUG_SOURCE_APPLICATION:
-		sstr << "Source: Application :0x" << std::hex << GL_DEBUG_SOURCE_APPLICATION;
+		sstr << "Source: Application :0x" << std::hex
+			 << GL_DEBUG_SOURCE_APPLICATION;
 		break;
 	case GL_DEBUG_SOURCE_OTHER:
 		sstr << "Source: Other :0x" << std::hex << GL_DEBUG_SOURCE_OTHER;
@@ -80,10 +86,12 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum 
 		sstr << "Type: Error :0x" << std::hex << GL_DEBUG_TYPE_ERROR;
 		break;
 	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-		sstr << "Type: Deprecated Behaviour :0x" << std::hex << GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR;
+		sstr << "Type: Deprecated Behaviour :0x" << std::hex
+			 << GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR;
 		break;
 	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
-		sstr << "Type: Undefined Behaviour :0x" << std::hex << GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR;
+		sstr << "Type: Undefined Behaviour :0x" << std::hex
+			 << GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR;
 		break;
 	case GL_DEBUG_TYPE_PORTABILITY:
 		sstr << "Type: Portability :0x" << std::hex << GL_DEBUG_TYPE_PORTABILITY;
@@ -118,7 +126,8 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum 
 		sstr << "Severity: low :0x" << std::hex << GL_DEBUG_SEVERITY_LOW;
 		break;
 	case GL_DEBUG_SEVERITY_NOTIFICATION:
-		sstr << "Severity: notification :0x" << std::hex << GL_DEBUG_SEVERITY_NOTIFICATION;
+		sstr << "Severity: notification :0x" << std::hex
+			 << GL_DEBUG_SEVERITY_NOTIFICATION;
 		break;
 	}
 	LOG(sstr.str());
@@ -126,13 +135,13 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum 
 
 void listGLInfo()
 {
-	//check opengl informations
+	// check opengl informations
 	LOG(glGetString(GL_VENDOR));
 	LOG(glGetString(GL_RENDERER));
 	LOG(glGetString(GL_VERSION));
 	LOG(glGetString(GL_SHADING_LANGUAGE_VERSION));
 
-	//extensions
+	// extensions
 #if 0
 	GLint a;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &a);
@@ -193,7 +202,8 @@ void listGLInfo()
 		"GL_TEXTURE_CUBE_MAP_SEAMLESS",
 	};
 
-	for (int i = 0, len = sizeof(glCapabilityEnum) / sizeof(glCapabilityEnum[0]); i < len; ++i)
+	for (int i = 0, len = sizeof(glCapabilityEnum) / sizeof(glCapabilityEnum[0]);
+		 i < len; ++i)
 	{
 		LOG(glCapabilityEnumNames[i]);
 		LOG(bool(glIsEnabled(glCapabilityEnum[i])));
@@ -413,5 +423,46 @@ void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, Pipeli
 		}
 		createProgram({1, &stageCreateInfo.shaderHandle}, &pPrograms[j]);
 		glUseProgramStages(*pPipeline, stageCreateInfo.stage, pPrograms[j]);
+	}
+}
+void createBuffer(const BufferCreateInfo &createInfo, BufferHandle *pBuffer)
+{
+	glGenBuffers(1, pBuffer);
+	// target do not matter when creating buffer
+	glBindBuffer(GL_ARRAY_BUFFER, *pBuffer);
+	if (GLVersion.major * 10 + GLVersion.minor < 44)
+		glBufferData(GL_ARRAY_BUFFER, createInfo.size, createInfo.pData,
+					 GL_DYNAMIC_DRAW);
+	else
+		glBufferStorage(GL_ARRAY_BUFFER, createInfo.size, createInfo.pData,
+						createInfo.storageFlags);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
+					   const std::vector<BufferHandle> &buffers,
+					   VertexArrayHandle *pVertexArray)
+{
+	std::vector<std::pair<int, int>> bindingDescriptions(vertexInputDescription.vertexBindingDescriptionsCount);
+
+	for (uint32_t i = 0; i < vertexInputDescription.vertexBindingDescriptionsCount; ++i)
+	{
+		const auto &e = vertexInputDescription.pVertexBindingDescriptions[i];
+		bindingDescriptions[e.binding] = {e.stride, e.divisor};
+	}
+
+	glGenVertexArrays(1, pVertexArray);
+	glBindVertexArray(*pVertexArray);
+
+	for (uint32_t i = 0; i < vertexInputDescription.vertexAttributeDescriptionsCount; ++i)
+	{
+		const auto &attrib = vertexInputDescription.pVertexAttributeDescriptions[i];
+		glBindBuffer(GL_ARRAY_BUFFER, buffers[attrib.binding]);
+		glEnableVertexAttribArray(attrib.location);
+		glVertexAttribPointer(
+			attrib.location, attrib.components,
+			Map(attrib.dataType), attrib.normalized,
+			bindingDescriptions[attrib.binding].first,
+			(void *)attrib.offset);
+		glVertexAttribDivisor(attrib.location, bindingDescriptions[attrib.binding].second);
 	}
 }

@@ -62,7 +62,7 @@ class Hello
 		EnableDebugOutput(this);
 #endif
 		createTestProgram();
-		createVertexArrays();
+		createVAO();
 
 		glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 	}
@@ -158,7 +158,7 @@ class Hello
 		createProgram({2, shaders}, &programId);
 	}
 
-	void createVertexArrays()
+	void createVAO()
 	{
 		glGenVertexArrays(1, &vertexArray);
 	}
