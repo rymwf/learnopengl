@@ -16,7 +16,6 @@
 #include <vector>
 #include <chrono>
 
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -45,37 +44,43 @@ typedef uint32_t BufferHandle;
 typedef uint32_t VertexArrayHandle;
 typedef uint32_t SamplerHandle;
 typedef uint32_t ImageHandle;
-typedef uint32_t MemoryHandle; //need GL_EXT_memory_object
+typedef uint32_t MemoryHandle;	  //need GL_EXT_memory_object
 typedef uint32_t SemaphoreHandle; //need GL_EXT_semaphore
 
-struct Offset2D{
+struct Offset2D
+{
 	int32_t x;
 	int32_t y;
 };
 
-struct Offset3D{
+struct Offset3D
+{
 	int32_t x;
 	int32_t y;
 	int32_t z;
 };
 
-struct Extent2D{
+struct Extent2D
+{
 	uint32_t width;
 	uint32_t height;
 };
 
-struct Extent3D{
+struct Extent3D
+{
 	uint32_t width;
 	uint32_t height;
 	uint32_t depth;
 };
 
-struct Rect2D{
+struct Rect2D
+{
 	Offset2D offset;
 	Extent2D extent;
 };
 
-struct Rect3D{
+struct Rect3D
+{
 	Offset3D offset;
 	Extent3D extent;
 };
@@ -87,7 +92,8 @@ union ClearColor
 	uint32_t uint32[4];
 };
 
-struct BorderColor{
+struct BorderColor
+{
 	DataType dataType;
 	ClearColor color;
 };
@@ -103,13 +109,14 @@ struct SamplerCreateInfo
 	float mipLodBias;
 	bool anisotopyEnable;
 	bool compareEnable;
-	CompareOp compareOp;	
+	CompareOp compareOp;
 	float minLod;
 	float maxLod;
 	BorderColor borderColor;
 };
 
-struct ImageCreateInfo{
+struct ImageCreateInfo
+{
 	ImageCreateFlags flags;
 	ImageType imageType;
 	Format format;
@@ -120,7 +127,8 @@ struct ImageCreateInfo{
 	ImageTiling tiling; //TODO:texture storage must be allocated using TexStorageMem*EXT
 };
 
-struct 	ImageSubresourceLayer{
+struct ImageSubresourceLayer
+{
 	uint32_t mipLevel;
 	uint32_t baseArrayLayer;
 	uint32_t layerCount;
@@ -134,13 +142,16 @@ struct ImageSubData
 	void *data;
 };
 
-struct ComponentMapping{
+struct ComponentMapping
+{
 	ComponentSwizzle r;
 	ComponentSwizzle g;
 	ComponentSwizzle b;
 	ComponentSwizzle a;
 };
-struct ImageSubresourceRange{
+struct ImageSubresourceRange
+{
+	ImageAspectFlags aspectMask;
 	uint32_t baseMipLevel;
 	uint32_t levelCount;
 	uint32_t baseArrayLayer;
@@ -162,7 +173,7 @@ struct DescriptorSetLayoutBinding
 	DescriptorType descriptorType;
 	uint32_t descriptorCount; //array
 	ShaderStageFlags stageFlags;
-	//const SamplerHandle* pImmutableSamplers;
+	const SamplerHandle *pImmutableSamplers;
 };
 
 struct DescriptorSetLayout
@@ -178,7 +189,7 @@ struct PushConstantRange
 
 struct PipelineLayoutCreateInfo
 {
-	uint32_t setLayoutCount;
+	uint32_t setLayoutCount; //opengl must be 1
 	const DescriptorSetLayout *pSetLayouts;
 	uint32_t pushConstantRangeCount;
 	const PushConstantRange *pPushConstantRanges;
@@ -205,7 +216,8 @@ struct BufferCreateInfo
 {
 	BufferCreateFlags flags;
 	size_t size;
-	union{
+	union
+	{
 		BufferStorageFlags storageFlags;
 		BufferMutableStorageUsage storageUsage;
 	};
@@ -358,3 +370,5 @@ void createImage(const ImageCreateInfo &createInfo, ImageHandle *pImage);
 void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageViewHandle);
 
 void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample, const ImageSubData &imageSubData);
+
+void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType);

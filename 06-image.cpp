@@ -77,6 +77,7 @@ class Hello
 
 	ImageHandle testImage;
 	ImageHandle testImageView;
+	SamplerHandle samplers[4];
 
 	void initWindow()
 	{
@@ -365,12 +366,14 @@ class Hello
 		if (!pixels)
 			throw std::runtime_error("failed to load texture image!");
 
+		uint32_t mipmapLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height))) + 1);
+
 		ImageCreateInfo imageCreateInfo{
 			0,
 			IMAGE_TYPE_2D,
 			GL_SRGB8_ALPHA8,
 			{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-			1,
+			mipmapLevels,
 			1,
 			SAMPLE_COUNT_1_BIT};
 		createImage(imageCreateInfo, &testImage);
@@ -382,14 +385,30 @@ class Hello
 			 imageCreateInfo.extent},
 			pixels};
 		updateImageSubData(testImage, imageCreateInfo.imageType, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, imageSubData);
+
+		glBindTexture(GL_TEXTURE_2D_ARRAY, testImage);
+		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+
 		ImageViewCreateInfo imageViewCreateInfo{
 			testImage,
 			IMAGE_VIEW_TYPE_2D,
 			GL_SRGB8_ALPHA8,
 			{},
-			{0, 1, 0, 1},
+			{IMAGE_ASPECT_COLOR_BIT, 5, 1, 0, 1},
 		};
 		createImageView(imageViewCreateInfo, &testImageView);
+
+		//bind image and sampler
+		SamplerCreateInfo samplerCreateInfo{
+			FILTER_NEAREST,
+			FILTER_NEAREST,
+			SAMPLER_MIPMAP_MODE_NEAREST,
+			SAMPLER_WRAP_MODE_REPEAT,
+			SAMPLER_WRAP_MODE_REPEAT,
+			SAMPLER_WRAP_MODE_REPEAT,
+		};
+		setImageSampler(samplerCreateInfo, testImageView, imageViewCreateInfo.viewType);
 
 		stbi_image_free(pixels);
 	}

@@ -676,15 +676,22 @@ GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings,
 
 void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageViewHandle)
 {
+	GLenum target=Map(createInfo.viewType);
 	glGenTextures(1, pImageViewHandle);
 	glTextureView(*pImageViewHandle,
-				  Map(createInfo.viewType),
+				  target,
 				  createInfo.image,
 				  createInfo.format,
 				  createInfo.subresourceRange.baseMipLevel,
 				  createInfo.subresourceRange.levelCount,
 				  createInfo.subresourceRange.baseArrayLayer,
 				  createInfo.subresourceRange.layerCount);
+	glBindTexture(target,*pImageViewHandle);
+	if (createInfo.subresourceRange.aspectMask & IMAGE_ASPECT_DEPTH_BIT)
+		glTextureParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+	else if (createInfo.subresourceRange.aspectMask & IMAGE_ASPECT_STENCIL_BIT)
+		glTextureParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_COMPONENTS);
+	glBindTexture(target, 0);
 }
 
 void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample, const ImageSubData &imageSubData)
@@ -723,3 +730,42 @@ void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample
 	}
 	glBindTexture(target, 0);
 };
+
+void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType)
+{
+	GLenum target = Map(imageViewType);
+	glBindTexture(target, image);
+
+	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, Map(createInfo.magFilter));
+	if (createInfo.mipmapMode == SAMPLER_MIPMAP_MODE_LINEAR)
+	{
+		if (createInfo.minFilter == FILTER_LINEAR)
+			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		else
+			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+	}
+	else
+	{
+		if (createInfo.minFilter == FILTER_LINEAR)
+			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+		else
+			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	}
+	glTexParameterf(target, GL_TEXTURE_MIN_LOD, createInfo.minLod);
+	glTexParameterf(target, GL_TEXTURE_MAX_LOD, createInfo.maxLod);
+	glTexParameteri(target, GL_TEXTURE_WRAP_S, Map(createInfo.wrapModeU));
+	glTexParameteri(target, GL_TEXTURE_WRAP_T, Map(createInfo.wrapModeV));
+	glTexParameteri(target, GL_TEXTURE_WRAP_R, Map(createInfo.wrapModeW));
+	if (createInfo.compareEnable)
+	{
+		glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, Map(createInfo.compareOp));
+	}
+	if (createInfo.borderColor.dataType == DATA_TYPE_INT)
+		glTexParameterIiv(target, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.int32);
+	else if (createInfo.borderColor.dataType == DATA_TYPE_UNSIGNED_INT)
+		glTexParameterIuiv(target, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.uint32);
+	else if (createInfo.borderColor.dataType == DATA_TYPE_FLOAT)
+		glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.float32);
+	glBindTexture(target, 0);
+}

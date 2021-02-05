@@ -191,6 +191,14 @@ enum ImageViewType
 	IMAGE_VIEW_TYPE_CUBE_ARRAY = 6,
 };
 
+enum ImageAspectFlagBits
+{
+	IMAGE_ASPECT_COLOR_BIT = 0x00000001,
+	IMAGE_ASPECT_DEPTH_BIT = 0x00000002,
+	IMAGE_ASPECT_STENCIL_BIT = 0x00000004
+};
+typedef Flags ImageAspectFlags;
+
 enum SampleCountFlagBits
 {
 	SAMPLE_COUNT_1_BIT = 0x00000001,
