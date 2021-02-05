@@ -48,9 +48,6 @@ class Hello
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
 			throw std::runtime_error("failed to load glad");
 
-		LOG(GLVersion.major);
-		LOG(GLVersion.minor);
-
 		listGLInfo();
 #ifndef NODEBUG
 		EnableDebugOutput(this);

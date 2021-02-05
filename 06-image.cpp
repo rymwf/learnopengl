@@ -9,12 +9,19 @@
  */
 #include "common.h"
 
+#pragma warning(disable : 5219)
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#pragma warning(default : 5219)
+
 constexpr GLuint WIDTH = 800, HEIGHT = 600;
+
+constexpr char *testImagePath = "./assets/textures/Lenna_test.jpg";
 
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
-constexpr char *vertFile = SHADER_PATH "05.vert";
-constexpr char *fragFile = SHADER_PATH "05.frag";
+constexpr char *vertFile = SHADER_PATH "06.vert";
+constexpr char *fragFile = SHADER_PATH "06.frag";
 
 //std140, round to base alignment of vec4
 struct UBO_MVP
@@ -25,8 +32,8 @@ struct UBO_MVP
 };
 
 UBO_MVP uboMVP{{
-				   {0.5f, 0, 0, 0},
-				   {0, 1, 0, 0},
+				   {2, 0, 0, 0},
+				   {0, 2, 0, 0},
 				   {0, 0, 1, 0},
 				   {0, 0, 0, 1},
 			   },
@@ -34,10 +41,10 @@ UBO_MVP uboMVP{{
 			   glm::mat4(1)};
 
 std::vector<Vertex> vertices{
-	{{-0.5, -0.5, 0}, {1, 0, 0}},
-	{{0.5, -0.5, 0}, {0, 1, 0}},
-	{{-0.5, 0.5, 0}, {0, 0, 1}},
-	{{0.5, 0.5, 0}, {1, 1, 0}},
+	{{-0.5, -0.5, 0}, {1, 0, 0}, {0, 1}},
+	{{0.5, -0.5, 0}, {0, 1, 0}, {1, 1}},
+	{{-0.5, 0.5, 0}, {0, 0, 1}, {0, 0}},
+	{{0.5, 0.5, 0}, {1, 1, 0}, {1, 0}},
 };
 std::vector<uint32_t> indices{
 	0, 1, 2, 2, 1, 3};
@@ -66,7 +73,10 @@ class Hello
 	BufferHandle drawIndirectCmdCountBuffer;
 	BufferHandle drawIndexedIndirectCmdBuffer;
 	BufferHandle drawIndexedIndirectCmdCountBuffer;
-	GLuint uboMVPBuffer;
+	BufferHandle uboMVPBuffer;
+
+	ImageHandle testImage;
+	ImageHandle testImageView;
 
 	void initWindow()
 	{
@@ -98,9 +108,6 @@ class Hello
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
 			throw std::runtime_error("failed to load glad");
 
-		LOG(GLVersion.major);
-		LOG(GLVersion.minor);
-
 		listGLInfo();
 
 #ifndef NODEBUG
@@ -108,6 +115,7 @@ class Hello
 #endif
 
 		glClearColor(0.2f, 0.2f, 0.2f, 1.f);
+		glEnable(GL_FRAMEBUFFER_SRGB);
 
 		createTestProgram();
 		createVertexBuffer();
@@ -115,6 +123,7 @@ class Hello
 		createUboBuffer();
 		createVAO();
 		createDrawCommandBuffer();
+		createTextureImage();
 	}
 	void mainLoop()
 	{
@@ -132,6 +141,9 @@ class Hello
 	}
 	void cleanup()
 	{
+		glDeleteTextures(1, &testImage);
+		glDeleteTextures(1, &testImageView);
+
 		glDeleteBuffers(1, &uboMVPBuffer);
 		glDeleteBuffers(1, &drawIndexedIndirectCmdCountBuffer);
 		glDeleteBuffers(1, &drawIndexedIndirectCmdBuffer);
@@ -151,10 +163,12 @@ class Hello
 	{
 		resize();
 		glClear(GL_COLOR_BUFFER_BIT);
+		updateUboBuffers();
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
-		updateUboBuffers();
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
+		//glBindTexture(GL_TEXTURE_2D_ARRAY, testImage);
+		glBindTexture(GL_TEXTURE_2D, testImageView);
 		//1
 		//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		//2
@@ -293,12 +307,12 @@ class Hello
 
 	void createVertexBuffer()
 	{
-		createBuffer({vertices.size() * sizeof(vertices[0]), vertices.data(), 0}, &vertexBuffer);
+		createBuffer({0, vertices.size() * sizeof(vertices[0]), 0}, vertices.data(), &vertexBuffer);
 	}
 
 	void createIndexBuffer()
 	{
-		createBuffer({indices.size() * sizeof(indices[0]), indices.data(), 0}, &indexBuffer);
+		createBuffer({0, indices.size() * sizeof(indices[0]), 0}, indices.data(), &indexBuffer);
 	}
 	void createVAO()
 	{
@@ -320,29 +334,64 @@ class Hello
 
 	void createDrawCommandBuffer()
 	{
-		createBuffer({sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size(), drawIndirectCmds.data()}, &drawIndirectCmdBuffer);
+		createBuffer({0, sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size()}, drawIndirectCmds.data(), &drawIndirectCmdBuffer);
 		uint32_t count = drawIndirectCmds.size();
-		createBuffer({4, &count}, &drawIndirectCmdCountBuffer);
+		createBuffer({0, 4}, &count, &drawIndirectCmdCountBuffer);
 
-		createBuffer({sizeof(drawIndexedIndirectCmds[0]) * drawIndexedIndirectCmds.size(), drawIndexedIndirectCmds.data()}, &drawIndexedIndirectCmdBuffer);
+		createBuffer({0, sizeof(drawIndexedIndirectCmds[0]) * drawIndexedIndirectCmds.size()}, drawIndexedIndirectCmds.data(), &drawIndexedIndirectCmdBuffer);
 		count = drawIndexedIndirectCmds.size();
-		createBuffer({4, &count}, &drawIndexedIndirectCmdCountBuffer);
+		createBuffer({0, 4}, &count, &drawIndexedIndirectCmdCountBuffer);
 	}
 
 	void createUboBuffer()
 	{
-		createBuffer({sizeof(UBO_MVP), &uboMVP, BUFFER_STORAGE_MAP_COHERENT_BIT | BUFFER_STORAGE_MAP_PERSISTENT_BIT | BUFFER_STORAGE_MAP_WRITE_BIT}, &uboMVPBuffer);
+		createBuffer({0, sizeof(UBO_MVP), BUFFER_STORAGE_MAP_WRITE_BIT}, &uboMVP, &uboMVPBuffer);
+		//createBuffer({BUFFER_CREATE_MUTABLE_FORMAT_BIT, sizeof(UBO_MVP),  BUFFER_MUTABLE_STORAGE_STREAM_DRAW}, &uboMVP,&uboMVPBuffer);
 	}
 	void updateUboBuffers()
 	{
-		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
-		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
+		//float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
+		//uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
 
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMVPBuffer, 0, sizeof(glm::mat4));
-		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4),
-									  GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-		memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
-		glUnmapBuffer(GL_UNIFORM_BUFFER);
+		//glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMVPBuffer, 0, sizeof(glm::mat4));
+		//void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
+		//memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
+		//glUnmapBuffer(GL_UNIFORM_BUFFER);
+	}
+	void createTextureImage()
+	{
+		int width, height, components;
+		auto pixels = stbi_load(testImagePath, &width, &height, &components, 4); //force load an alpha channel,even not exist
+		if (!pixels)
+			throw std::runtime_error("failed to load texture image!");
+
+		ImageCreateInfo imageCreateInfo{
+			0,
+			IMAGE_TYPE_2D,
+			GL_SRGB8_ALPHA8,
+			{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+			1,
+			1,
+			SAMPLE_COUNT_1_BIT};
+		createImage(imageCreateInfo, &testImage);
+		ImageSubData imageSubData{
+			GL_RGBA,
+			DATA_TYPE_UNSIGNED_BYTE,
+			0,
+			{{},
+			 imageCreateInfo.extent},
+			pixels};
+		updateImageSubData(testImage, imageCreateInfo.imageType, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, imageSubData);
+		ImageViewCreateInfo imageViewCreateInfo{
+			testImage,
+			IMAGE_VIEW_TYPE_2D,
+			GL_SRGB8_ALPHA8,
+			{},
+			{0, 1, 0, 1},
+		};
+		createImageView(imageViewCreateInfo, &testImageView);
+
+		stbi_image_free(pixels);
 	}
 
 public:

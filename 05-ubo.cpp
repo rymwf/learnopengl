@@ -66,7 +66,7 @@ class Hello
 	BufferHandle drawIndirectCmdCountBuffer;
 	BufferHandle drawIndexedIndirectCmdBuffer;
 	BufferHandle drawIndexedIndirectCmdCountBuffer;
-	GLuint uboMVPBuffer;
+	BufferHandle uboMVPBuffer;
 
 	void initWindow()
 	{
@@ -97,9 +97,6 @@ class Hello
 	{
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
 			throw std::runtime_error("failed to load glad");
-
-		LOG(GLVersion.major);
-		LOG(GLVersion.minor);
 
 		listGLInfo();
 
@@ -293,12 +290,12 @@ class Hello
 
 	void createVertexBuffer()
 	{
-		createBuffer({vertices.size() * sizeof(vertices[0]), vertices.data(), 0}, &vertexBuffer);
+		createBuffer({0, vertices.size() * sizeof(vertices[0]), 0}, vertices.data(), &vertexBuffer);
 	}
 
 	void createIndexBuffer()
 	{
-		createBuffer({indices.size() * sizeof(indices[0]), indices.data(), 0}, &indexBuffer);
+		createBuffer({0, indices.size() * sizeof(indices[0]), 0}, indices.data(), &indexBuffer);
 	}
 	void createVAO()
 	{
@@ -320,18 +317,19 @@ class Hello
 
 	void createDrawCommandBuffer()
 	{
-		createBuffer({sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size(), drawIndirectCmds.data()}, &drawIndirectCmdBuffer);
+		createBuffer({0, sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size()}, drawIndirectCmds.data(), &drawIndirectCmdBuffer);
 		uint32_t count = drawIndirectCmds.size();
-		createBuffer({4, &count}, &drawIndirectCmdCountBuffer);
+		createBuffer({0, 4}, &count, &drawIndirectCmdCountBuffer);
 
-		createBuffer({sizeof(drawIndexedIndirectCmds[0]) * drawIndexedIndirectCmds.size(), drawIndexedIndirectCmds.data()}, &drawIndexedIndirectCmdBuffer);
+		createBuffer({0, sizeof(drawIndexedIndirectCmds[0]) * drawIndexedIndirectCmds.size()}, drawIndexedIndirectCmds.data(), &drawIndexedIndirectCmdBuffer);
 		count = drawIndexedIndirectCmds.size();
-		createBuffer({4, &count}, &drawIndexedIndirectCmdCountBuffer);
+		createBuffer({0, 4}, &count, &drawIndexedIndirectCmdCountBuffer);
 	}
 
 	void createUboBuffer()
 	{
-		createBuffer({sizeof(UBO_MVP), &uboMVP, BUFFER_STORAGE_MAP_COHERENT_BIT | BUFFER_STORAGE_MAP_PERSISTENT_BIT | BUFFER_STORAGE_MAP_WRITE_BIT}, &uboMVPBuffer);
+		createBuffer({0, sizeof(UBO_MVP), BUFFER_STORAGE_MAP_WRITE_BIT}, &uboMVP, &uboMVPBuffer);
+		//createBuffer({BUFFER_CREATE_MUTABLE_FORMAT_BIT, sizeof(UBO_MVP),  BUFFER_MUTABLE_STORAGE_STREAM_DRAW}, &uboMVP,&uboMVPBuffer);
 	}
 	void updateUboBuffers()
 	{
@@ -339,8 +337,7 @@ class Hello
 		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
 
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMVPBuffer, 0, sizeof(glm::mat4));
-		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4),
-									  GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
 		memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
 		glUnmapBuffer(GL_UNIFORM_BUFFER);
 	}

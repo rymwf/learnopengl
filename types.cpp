@@ -33,7 +33,7 @@ constexpr GLenum glBufferBindTargetArray[]{
 	GL_DISPATCH_INDIRECT_BUFFER,
 	GL_DRAW_INDIRECT_BUFFER, //indirect
 	GL_ELEMENT_ARRAY_BUFFER, //index
-	GL_PARAMETER_BUFFER,	//indirect multidraw 
+	GL_PARAMETER_BUFFER,	 //indirect multidraw
 	GL_PIXEL_PACK_BUFFER,
 	GL_PIXEL_UNPACK_BUFFER,
 	GL_QUERY_BUFFER,
@@ -73,6 +73,17 @@ constexpr GLbitfield glBufferStorageFlagBitArray[]{
 	GL_DYNAMIC_STORAGE_BIT, // 0x0100
 	GL_CLIENT_STORAGE_BIT,	// 0x0200
 };
+constexpr GLenum glMutableStorageUsageArray[]{
+	GL_STREAM_DRAW,
+	GL_STREAM_READ,
+	GL_STREAM_COPY,
+	GL_DYNAMIC_DRAW,
+	GL_DYNAMIC_READ,
+	GL_DYNAMIC_COPY,
+	GL_STATIC_DRAW,
+	GL_STATIC_READ,
+	GL_STATIC_COPY,
+};
 constexpr GLbitfield glBufferMapFlagBitArray[]{
 	GL_MAP_READ_BIT,			  // 0x0001
 	GL_MAP_WRITE_BIT,			  // 0x0002
@@ -101,6 +112,59 @@ constexpr GLbitfield glMemoryBarrierFlagBitArray[]{
 	GL_QUERY_BUFFER_BARRIER_BIT,		 // 0x00008000
 	GL_ALL_BARRIER_BITS,				 // 0xFFFFFFFF
 };
+GLenum glImageTypeArray[]{
+	GL_TEXTURE_1D_ARRAY,
+	GL_TEXTURE_2D_ARRAY,
+	GL_TEXTURE_3D,
+};
+GLenum glImageViewTypeArray[]{
+	GL_TEXTURE_1D,
+	GL_TEXTURE_2D,
+	GL_TEXTURE_3D,
+	GL_TEXTURE_CUBE_MAP,
+	GL_TEXTURE_1D_ARRAY,
+	GL_TEXTURE_2D_ARRAY,
+	GL_TEXTURE_CUBE_MAP_ARRAY,
+};
+
+GLenum glImageTilingArray[]{
+	GL_OPTIMAL_TILING_EXT,
+	GL_LINEAR_TILING_EXT,
+};
+
+GLenum glFilterArray[]{
+	GL_NEAREST,
+	GL_LINEAR,
+};
+
+GLenum glSamplerWrapModeArray[]{
+	GL_REPEAT,
+	GL_MIRRORED_REPEAT,
+	GL_CLAMP_TO_EDGE,
+	GL_CLAMP_TO_BORDER,
+};
+GLenum glCompareOpArray[]{
+	GL_NEVER,
+	GL_LESS,
+	GL_EQUAL,
+	GL_LEQUAL,
+	GL_GREATER,
+	GL_NOTEQUAL,
+	GL_GEQUAL,
+	GL_ALWAYS};
+
+GLenum glImageLayoutArray[]{
+	GL_NONE,										  //| VK_IMAGE_LAYOUT_UNDEFINED                                      |
+	GL_LAYOUT_GENERAL_EXT,							  //| VK_IMAGE_LAYOUT_GENERAL                                        |
+	GL_LAYOUT_COLOR_ATTACHMENT_EXT,					  //| VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL                       |
+	GL_LAYOUT_DEPTH_STENCIL_ATTACHMENT_EXT,			  //| VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT                       |
+	GL_LAYOUT_DEPTH_STENCIL_READ_ONLY_EXT,			  //| VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL                |
+	GL_LAYOUT_SHADER_READ_ONLY_EXT,					  //| VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL                       |
+	GL_LAYOUT_TRANSFER_SRC_EXT,						  //| VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL                           |
+	GL_LAYOUT_TRANSFER_DST_EXT,						  //| VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL                           |
+	GL_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_EXT, //| VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL_KHR |
+	GL_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_EXT, //| VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL_KHR
+};
 
 GLenum Map(DataType dataType)
 {
@@ -117,4 +181,39 @@ GLenum Map(ShaderBinaryFormat shaderBinaryFormat)
 GLbitfield Map(ShaderStageFlagBits flagbit)
 {
 	return flagbit;
+}
+GLenum Map(ImageType imageType, bool multisample)
+{
+	if (multisample)
+		return GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+	else
+		return glImageTypeArray[static_cast<size_t>(imageType)];
+}
+GLenum Map(SamplerWrapMode wrapMode)
+{
+	return glSamplerWrapModeArray[static_cast<size_t>(wrapMode)];
+}
+GLenum Map(CompareOp op)
+{
+	return glCompareOpArray[static_cast<size_t>(op)];
+}
+GLenum Map(Filter filter)
+{
+	return glFilterArray[static_cast<size_t>(filter)];
+}
+GLenum Map(ImageTiling tiling)
+{
+	return glImageTilingArray[static_cast<size_t>(tiling)];
+}
+GLenum Map(ImageLayout imageLayout)
+{
+	return glImageLayoutArray[static_cast<size_t>(imageLayout)];
+}
+GLenum Map(BufferMutableStorageUsage usage)
+{
+	return glMutableStorageUsageArray[static_cast<size_t>(usage)];
+}
+GLenum Map(ImageViewType viewType)
+{
+	return glImageViewTypeArray[static_cast<size_t>(viewType)];
 }

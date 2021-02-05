@@ -135,6 +135,25 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id,
 
 void listGLInfo()
 {
+#ifdef GL_EXT_memory_object
+	int NUM_DEVICE_UUIDS_EXT;
+	glGetIntegerv(GL_NUM_DEVICE_UUIDS_EXT, &NUM_DEVICE_UUIDS_EXT);
+	LOG_VAR(NUM_DEVICE_UUIDS_EXT);
+	int DEVICE_UUID_EXT;
+	for (int i = 0; i < NUM_DEVICE_UUIDS_EXT; ++i)
+	{
+		LOG(i);
+		glGetIntegeri_v(GL_DEVICE_UUID_EXT, i, &DEVICE_UUID_EXT);
+		LOG_VAR(DEVICE_UUID_EXT);
+	}
+	int DRIVER_UUID_EXT;
+	glGetIntegerv(GL_DRIVER_UUID_EXT, &DRIVER_UUID_EXT);
+	LOG_VAR(DRIVER_UUID_EXT);
+#endif
+
+	LOG_VAR(GLVersion.major);
+	LOG_VAR(GLVersion.minor);
+
 	// check opengl informations
 	LOG_VAR(glGetString(GL_VENDOR));
 	LOG_VAR(glGetString(GL_RENDERER));
@@ -425,17 +444,16 @@ void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, Pipeli
 		glUseProgramStages(*pPipeline, stageCreateInfo.stage, pPrograms[j]);
 	}
 }
-void createBuffer(const BufferCreateInfo &createInfo, BufferHandle *pBuffer)
+void createBuffer(const BufferCreateInfo &createInfo, const void *pData, BufferHandle *pBuffer)
 {
 	glGenBuffers(1, pBuffer);
 	// target do not matter when creating buffer
 	glBindBuffer(GL_ARRAY_BUFFER, *pBuffer);
-	if (GLVersion.major * 10 + GLVersion.minor < 44)
-		glBufferData(GL_ARRAY_BUFFER, createInfo.size, createInfo.pData,
-					 GL_DYNAMIC_DRAW);
+	if (createInfo.flags & BUFFER_CREATE_MUTABLE_FORMAT_BIT)
+		glBufferData(GL_ARRAY_BUFFER, createInfo.size, pData, Map(createInfo.storageUsage));
 	else
-		glBufferStorage(GL_ARRAY_BUFFER, createInfo.size, createInfo.pData,
-						createInfo.storageFlags);
+		//(GLVersion.major * 10 + GLVersion.minor < 44 || GL_ARB_buffer_storage)
+		glBufferStorage(GL_ARRAY_BUFFER, createInfo.size, pData, createInfo.storageFlags);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
@@ -471,3 +489,237 @@ void createVertexArray(const VertexInputStateDescription &vertexInputDescription
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
 	glBindVertexArray(0);
 }
+
+void createImage(const ImageCreateInfo &createInfo, ImageHandle *pImage)
+{
+	glGenTextures(1, pImage);
+	GLenum target = Map(createInfo.imageType, createInfo.samples > SAMPLE_COUNT_1_BIT);
+	glBindTexture(target, *pImage);
+	if (createInfo.flags & IMAGE_CREAT_MUTABLE_FORMAT_BIT)
+	{
+		if (createInfo.samples > SAMPLE_COUNT_1_BIT)
+		{
+			glTexImage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY,
+									createInfo.samples,
+									createInfo.format,
+									createInfo.extent.width,
+									createInfo.extent.height,
+									createInfo.extent.depth,
+									GL_FALSE);
+		}
+		else
+		{
+			switch (createInfo.imageType)
+			{
+			case IMAGE_TYPE_1D:
+				glTexImage2D(GL_TEXTURE_1D_ARRAY,
+							 0,
+							 createInfo.format,
+							 createInfo.extent.width,
+							 createInfo.extent.height,
+							 0,
+							 GL_RGBA,
+							 GL_UNSIGNED_BYTE,
+							 nullptr);
+				break;
+			case IMAGE_TYPE_2D:
+				glTexImage3D(GL_TEXTURE_2D_ARRAY,
+							 0,
+							 createInfo.format,
+							 createInfo.extent.width,
+							 createInfo.extent.height,
+							 createInfo.extent.depth,
+							 0,
+							 GL_RGBA,
+							 GL_UNSIGNED_BYTE,
+							 nullptr);
+				break;
+			case IMAGE_TYPE_3D:
+				glTexImage3D(GL_TEXTURE_3D,
+							 0,
+							 createInfo.format,
+							 createInfo.extent.width,
+							 createInfo.extent.height,
+							 createInfo.extent.depth,
+							 0,
+							 GL_RGBA,
+							 GL_UNSIGNED_BYTE,
+							 nullptr);
+				break;
+			}
+		}
+	}
+	else
+	{
+		if (createInfo.samples > SAMPLE_COUNT_1_BIT)
+		{
+			glTexStorage3DMultisample(target,
+									  createInfo.samples,
+									  createInfo.format,
+									  createInfo.extent.width,
+									  createInfo.extent.height,
+									  createInfo.extent.depth,
+									  GL_FALSE);
+		}
+		else
+		{
+			switch (createInfo.imageType)
+			{
+			case IMAGE_TYPE_1D:
+				glTexStorage2D(target,
+							   createInfo.mipLevels,
+							   createInfo.format,
+							   createInfo.extent.width,
+							   createInfo.extent.height);
+				break;
+			case IMAGE_TYPE_2D:
+				glTexStorage3D(target,
+							   createInfo.mipLevels,
+							   createInfo.format,
+							   createInfo.extent.width,
+							   createInfo.extent.height,
+							   createInfo.extent.depth);
+				break;
+			case IMAGE_TYPE_3D:
+				glTexStorage3D(target,
+							   createInfo.mipLevels,
+							   createInfo.format,
+							   createInfo.extent.width,
+							   createInfo.extent.height,
+							   createInfo.extent.depth);
+				break;
+			}
+		}
+	}
+	glBindTexture(target, 0);
+}
+
+void createSampler(const SamplerCreateInfo &createInfo, SamplerHandle *pSampler)
+{
+	glGenSamplers(1, pSampler);
+	glSamplerParameteri(*pSampler, GL_TEXTURE_MAG_FILTER, Map(createInfo.magFilter));
+	if (createInfo.mipmapMode == SAMPLER_MIPMAP_MODE_LINEAR)
+	{
+		if (createInfo.minFilter == FILTER_LINEAR)
+			glSamplerParameteri(*pSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		else
+			glSamplerParameteri(*pSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+	}
+	else
+	{
+		if (createInfo.minFilter == FILTER_LINEAR)
+			glSamplerParameteri(*pSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+		else
+			glSamplerParameteri(*pSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	}
+	glSamplerParameterf(*pSampler, GL_TEXTURE_MIN_LOD, createInfo.minLod);
+	glSamplerParameterf(*pSampler, GL_TEXTURE_MAX_LOD, createInfo.maxLod);
+	glSamplerParameteri(*pSampler, GL_TEXTURE_WRAP_S, Map(createInfo.wrapModeU));
+	glSamplerParameteri(*pSampler, GL_TEXTURE_WRAP_T, Map(createInfo.wrapModeV));
+	glSamplerParameteri(*pSampler, GL_TEXTURE_WRAP_R, Map(createInfo.wrapModeW));
+	if (createInfo.compareEnable)
+	{
+		glSamplerParameteri(*pSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glSamplerParameteri(*pSampler, GL_TEXTURE_COMPARE_FUNC, Map(createInfo.compareOp));
+	}
+	if (createInfo.borderColor.dataType == DATA_TYPE_INT)
+		glSamplerParameterIiv(*pSampler, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.int32);
+	else if (createInfo.borderColor.dataType == DATA_TYPE_UNSIGNED_INT)
+		glSamplerParameterIuiv(*pSampler, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.uint32);
+	else if (createInfo.borderColor.dataType == DATA_TYPE_FLOAT)
+		glSamplerParameterfv(*pSampler, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.float32);
+}
+
+//void createMemory(MemoryHandle *pMemory)
+//{
+//	/*
+//		server memory, cannot be accessed directly
+//	*/
+//	glCreateMemoryObjectsEXT(1, pMemory);
+//
+//	int dedicatedMemory{}; //external memory
+//	glMemoryObjectParameterivEXT(*pMemory, GL_DEDICATED_MEMORY_OBJECT_EXT, &dedicatedMemory);
+//	int protectedMemory{}; //
+//	glMemoryObjectParameterivEXT(*pMemory, GL_PROTECTED_MEMORY_OBJECT_EXT, &protectedMemory);
+//}
+SemaphoreHandle createSemaphore()
+{
+	SemaphoreHandle semaphore;
+	glGenSemaphoresEXT(1, &semaphore);
+	return semaphore;
+}
+
+GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings, ImageType imageType, bool multisample, GLenum format)
+{
+	GLenum target = Map(imageType, multisample);
+
+	int NUM_TILING_TYPES_EXT;
+	glGetInternalformativ(target, format, GL_NUM_TILING_TYPES_EXT, 1, &NUM_TILING_TYPES_EXT);
+	LOG_VAR(NUM_TILING_TYPES_EXT);
+
+	std::vector<int> TILING_TYPES_EXT(NUM_TILING_TYPES_EXT);
+	glGetInternalformativ(target, format, GL_TILING_TYPES_EXT, NUM_TILING_TYPES_EXT, TILING_TYPES_EXT.data());
+	for (auto canditiling : candidateTilings)
+	{
+		for (GLenum tiling : TILING_TYPES_EXT)
+		{
+			if (Map(canditiling) == tiling)
+			{
+				LOG("support tiling type is:");
+				LOG(tiling);
+				return tiling;
+			}
+		}
+	}
+	throw std::runtime_error("failed to find supported tiling type");
+}
+
+void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageViewHandle)
+{
+	glGenTextures(1, pImageViewHandle);
+	glTextureView(*pImageViewHandle,
+				  Map(createInfo.viewType),
+				  createInfo.image,
+				  createInfo.format,
+				  createInfo.subresourceRange.baseMipLevel,
+				  createInfo.subresourceRange.levelCount,
+				  createInfo.subresourceRange.baseArrayLayer,
+				  createInfo.subresourceRange.layerCount);
+}
+
+void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample, const ImageSubData &imageSubData)
+{
+	GLenum target = Map(imageType, multisample);
+	glBindTexture(target, image);
+	switch (imageType)
+	{
+	case IMAGE_TYPE_1D:
+		glTexSubImage2D(
+			target,
+			imageSubData.mipLevel,
+			imageSubData.rect.offset.x,
+			imageSubData.rect.offset.y,
+			imageSubData.rect.extent.width,
+			imageSubData.rect.extent.height,
+			imageSubData.format,
+			Map(imageSubData.dataType),
+			imageSubData.data);
+		break;
+	case IMAGE_TYPE_2D:
+	case IMAGE_TYPE_3D:
+		glTexSubImage3D(
+			target,
+			imageSubData.mipLevel,
+			imageSubData.rect.offset.x,
+			imageSubData.rect.offset.y,
+			imageSubData.rect.offset.z,
+			imageSubData.rect.extent.width,
+			imageSubData.rect.extent.height,
+			imageSubData.rect.extent.depth,
+			imageSubData.format,
+			Map(imageSubData.dataType),
+			imageSubData.data);
+		break;
+	}
+	glBindTexture(target, 0);
+};

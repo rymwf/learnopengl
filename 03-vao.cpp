@@ -68,9 +68,6 @@ class Hello
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
 			throw std::runtime_error("failed to load glad");
 
-		LOG(GLVersion.major);
-		LOG(GLVersion.minor);
-
 		listGLInfo();
 
 #ifndef NODEBUG
@@ -214,7 +211,7 @@ class Hello
 
 	void createVertexBuffer()
 	{
-		createBuffer({vertices.size() * sizeof(vertices[0]), vertices.data(), 0}, &vertexBuffer);
+		createBuffer({0, vertices.size() * sizeof(vertices[0]), 0}, vertices.data(), &vertexBuffer);
 	}
 
 	void createVAO()
@@ -236,9 +233,9 @@ class Hello
 	}
 	void createDrawCommandBuffer()
 	{
-		createBuffer({sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size(), drawIndirectCmds.data()}, &drawIndirectCmdBuffer);
+		createBuffer({0, sizeof(drawIndirectCmds[0]) * drawIndirectCmds.size()}, drawIndirectCmds.data(), &drawIndirectCmdBuffer);
 		uint32_t count = drawIndirectCmds.size();
-		createBuffer({4, &count}, &drawIndirectCmdCountBuffer);
+		createBuffer({0, 4}, &count, &drawIndirectCmdCountBuffer);
 	}
 
 public:
