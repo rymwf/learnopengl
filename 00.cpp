@@ -9,6 +9,8 @@
  */
 #include "common.h"
 
+constexpr GLuint WIDTH = 800, HEIGHT = 600;
+
 class Hello
 {
 	GLFWwindow *window;

@@ -367,8 +367,8 @@ GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings,
 
 void createImage(const ImageCreateInfo &createInfo, ImageHandle *pImage);
 
-void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageViewHandle);
+void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, ImageHandle *pImageViewHandle);
 
-void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample, const ImageSubData &imageSubData);
+void updateImageSubData(ImageHandle image, ImageType imageType, const ImageSubData &imageSubData);
 
 void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType);

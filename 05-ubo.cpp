@@ -336,7 +336,7 @@ class Hello
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
 		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
 
-		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMVPBuffer, 0, sizeof(glm::mat4));
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
 		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
 		memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
 		glUnmapBuffer(GL_UNIFORM_BUFFER);

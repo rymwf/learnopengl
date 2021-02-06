@@ -159,6 +159,9 @@ void listGLInfo()
 	LOG_VAR(glGetString(GL_RENDERER));
 	LOG_VAR(glGetString(GL_VERSION));
 	LOG_VAR(glGetString(GL_SHADING_LANGUAGE_VERSION));
+	int samples;
+	glGetIntegerv(GL_SAMPLES, &samples);
+	LOG_VAR(samples);
 
 	// extensions
 #if 0
@@ -612,6 +615,7 @@ void createSampler(const SamplerCreateInfo &createInfo, SamplerHandle *pSampler)
 		else
 			glSamplerParameteri(*pSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 	}
+	glSamplerParameterf(*pSampler, GL_TEXTURE_LOD_BIAS, createInfo.mipLodBias);
 	glSamplerParameterf(*pSampler, GL_TEXTURE_MIN_LOD, createInfo.minLod);
 	glSamplerParameterf(*pSampler, GL_TEXTURE_MAX_LOD, createInfo.maxLod);
 	glSamplerParameteri(*pSampler, GL_TEXTURE_WRAP_S, Map(createInfo.wrapModeU));
@@ -674,9 +678,9 @@ GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings,
 	throw std::runtime_error("failed to find supported tiling type");
 }
 
-void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageViewHandle)
+void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, ImageHandle *pImageViewHandle)
 {
-	GLenum target=Map(createInfo.viewType);
+	GLenum target = Map(createInfo.viewType, multisample);
 	glGenTextures(1, pImageViewHandle);
 	glTextureView(*pImageViewHandle,
 				  target,
@@ -686,7 +690,7 @@ void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageV
 				  createInfo.subresourceRange.levelCount,
 				  createInfo.subresourceRange.baseArrayLayer,
 				  createInfo.subresourceRange.layerCount);
-	glBindTexture(target,*pImageViewHandle);
+	glBindTexture(target, *pImageViewHandle);
 	if (createInfo.subresourceRange.aspectMask & IMAGE_ASPECT_DEPTH_BIT)
 		glTextureParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 	else if (createInfo.subresourceRange.aspectMask & IMAGE_ASPECT_STENCIL_BIT)
@@ -694,9 +698,9 @@ void createImageView(const ImageViewCreateInfo &createInfo, ImageHandle *pImageV
 	glBindTexture(target, 0);
 }
 
-void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample, const ImageSubData &imageSubData)
+void updateImageSubData(ImageHandle image, ImageType imageType, const ImageSubData &imageSubData)
 {
-	GLenum target = Map(imageType, multisample);
+	GLenum target = Map(imageType, false);
 	glBindTexture(target, image);
 	switch (imageType)
 	{
@@ -733,7 +737,8 @@ void updateImageSubData(ImageHandle image, ImageType imageType, bool multisample
 
 void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType)
 {
-	GLenum target = Map(imageViewType);
+	//multisample texture do not support sampler parameter
+	GLenum target = Map(imageViewType, false);
 	glBindTexture(target, image);
 
 	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, Map(createInfo.magFilter));
@@ -751,6 +756,7 @@ void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, Ima
 		else
 			glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 	}
+	glTexParameterf(target, GL_TEXTURE_LOD_BIAS, createInfo.mipLodBias);
 	glTexParameterf(target, GL_TEXTURE_MIN_LOD, createInfo.minLod);
 	glTexParameterf(target, GL_TEXTURE_MAX_LOD, createInfo.maxLod);
 	glTexParameteri(target, GL_TEXTURE_WRAP_S, Map(createInfo.wrapModeU));

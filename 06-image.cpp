@@ -14,9 +14,11 @@
 #include <stb_image.h>
 #pragma warning(default : 5219)
 
-constexpr GLuint WIDTH = 800, HEIGHT = 600;
+int WIDTH = 800, HEIGHT = 600;
 
 constexpr char *testImagePath = "./assets/textures/Lenna_test.jpg";
+
+SampleCountFlagBits samples = SAMPLE_COUNT_1_BIT;
 
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
@@ -76,7 +78,8 @@ class Hello
 	BufferHandle uboMVPBuffer;
 
 	ImageHandle testImage;
-	ImageHandle testImageView;
+	ImageHandle testImageView0;
+	ImageHandle testImageView1;
 	SamplerHandle samplers[4];
 
 	void initWindow()
@@ -93,6 +96,9 @@ class Hello
 #ifndef NDEBUG
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 #endif
+		glfwWindowHint(GLFW_SRGB_CAPABLE, GL_TRUE);
+		glfwWindowHint(GLFW_SAMPLES, 16);
+
 		window = glfwCreateWindow(WIDTH, HEIGHT, __FILE__, nullptr, nullptr);
 		if (!window)
 		{
@@ -109,14 +115,15 @@ class Hello
 		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
 			throw std::runtime_error("failed to load glad");
 
-		listGLInfo();
-
 #ifndef NODEBUG
 		EnableDebugOutput(this);
 #endif
 
 		glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 		glEnable(GL_FRAMEBUFFER_SRGB);
+		glEnable(GL_MULTISAMPLE);
+
+		listGLInfo();
 
 		createTestProgram();
 		createVertexBuffer();
@@ -143,7 +150,8 @@ class Hello
 	void cleanup()
 	{
 		glDeleteTextures(1, &testImage);
-		glDeleteTextures(1, &testImageView);
+		glDeleteTextures(1, &testImageView0);
+		glDeleteTextures(1, &testImageView1);
 
 		glDeleteBuffers(1, &uboMVPBuffer);
 		glDeleteBuffers(1, &drawIndexedIndirectCmdCountBuffer);
@@ -168,8 +176,14 @@ class Hello
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
+
 		//glBindTexture(GL_TEXTURE_2D_ARRAY, testImage);
-		glBindTexture(GL_TEXTURE_2D, testImageView);
+		if (samples > SAMPLE_COUNT_1_BIT)
+			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, testImageView0);
+		else
+			glBindTexture(GL_TEXTURE_2D, testImageView0);
+		//glBindTexture(GL_TEXTURE_2D, testImageView1);
+
 		//1
 		//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		//2
@@ -245,15 +259,21 @@ class Hello
 	{
 		if (framebufferResized)
 		{
-			int width = 0, height = 0;
-			glfwGetFramebufferSize(window, &width, &height);
-			if (width == 0 || height == 0)
+			//int width = 0, height = 0;
+			glfwGetFramebufferSize(window, &WIDTH, &HEIGHT);
+			if (WIDTH == 0 || HEIGHT == 0)
 			{
-				glfwGetFramebufferSize(window, &width, &height);
+				glfwGetFramebufferSize(window, &WIDTH, &HEIGHT);
 				glfwWaitEvents();
 			}
-			glViewport(0, 0, width, height);
+			glViewport(0, 0, WIDTH, HEIGHT);
 			framebufferResized = false;
+
+			uboMVP.P = glm::perspective(glm::radians(45.f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 1.f, 10.f);
+			glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
+			void *data = glMapBufferRange(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
+			memcpy(data, &uboMVP.P, sizeof(glm::mat4));
+			glUnmapBuffer(GL_UNIFORM_BUFFER);
 		}
 	}
 
@@ -346,6 +366,10 @@ class Hello
 
 	void createUboBuffer()
 	{
+		uboMVP = {
+			glm::rotate(glm::mat4(1), glm::radians(20.f), glm::vec3(0, 0, 1)),
+			glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0), glm::vec3(0, 1, 0)),
+			glm::perspective(glm::radians(45.f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 1.f, 10.f)};
 		createBuffer({0, sizeof(UBO_MVP), BUFFER_STORAGE_MAP_WRITE_BIT}, &uboMVP, &uboMVPBuffer);
 		//createBuffer({BUFFER_CREATE_MUTABLE_FORMAT_BIT, sizeof(UBO_MVP),  BUFFER_MUTABLE_STORAGE_STREAM_DRAW}, &uboMVP,&uboMVPBuffer);
 	}
@@ -375,7 +399,7 @@ class Hello
 			{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
 			mipmapLevels,
 			1,
-			SAMPLE_COUNT_1_BIT};
+			samples};
 		createImage(imageCreateInfo, &testImage);
 		ImageSubData imageSubData{
 			GL_RGBA,
@@ -384,20 +408,28 @@ class Hello
 			{{},
 			 imageCreateInfo.extent},
 			pixels};
-		updateImageSubData(testImage, imageCreateInfo.imageType, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, imageSubData);
 
-		glBindTexture(GL_TEXTURE_2D_ARRAY, testImage);
-		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+		if (imageCreateInfo.samples <= SAMPLE_COUNT_1_BIT)
+		{
+			updateImageSubData(testImage, imageCreateInfo.imageType, imageSubData);
+
+			GLenum target = Map(IMAGE_TYPE_2D, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT);
+			glBindTexture(target, testImage);
+			glGenerateMipmap(target);
+			glBindTexture(target, 0);
+		}
 
 		ImageViewCreateInfo imageViewCreateInfo{
 			testImage,
 			IMAGE_VIEW_TYPE_2D,
 			GL_SRGB8_ALPHA8,
 			{},
-			{IMAGE_ASPECT_COLOR_BIT, 5, 1, 0, 1},
+			{IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 		};
-		createImageView(imageViewCreateInfo, &testImageView);
+		createImageView(imageViewCreateInfo, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, &testImageView0);
+		imageViewCreateInfo.format = GL_RGBA8;
+		imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+		createImageView(imageViewCreateInfo, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, &testImageView1);
 
 		//bind image and sampler
 		SamplerCreateInfo samplerCreateInfo{
@@ -407,8 +439,13 @@ class Hello
 			SAMPLER_WRAP_MODE_REPEAT,
 			SAMPLER_WRAP_MODE_REPEAT,
 			SAMPLER_WRAP_MODE_REPEAT,
+			0,
 		};
-		setImageSampler(samplerCreateInfo, testImageView, imageViewCreateInfo.viewType);
+		if (imageCreateInfo.samples <= SAMPLE_COUNT_1_BIT)
+		{
+			setImageSampler(samplerCreateInfo, testImageView0, imageViewCreateInfo.viewType);
+			setImageSampler(samplerCreateInfo, testImageView1, imageViewCreateInfo.viewType);
+		}
 
 		stbi_image_free(pixels);
 	}
