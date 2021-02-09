@@ -213,7 +213,17 @@ GLenum Map(BufferMutableStorageUsage usage)
 {
 	return glMutableStorageUsageArray[static_cast<size_t>(usage)];
 }
-GLenum Map(ImageViewType viewType)
+GLenum Map(ImageViewType viewType, bool multisample)
 {
-	return glImageViewTypeArray[static_cast<size_t>(viewType)];
+	if (multisample)
+	{
+		if (viewType == IMAGE_VIEW_TYPE_2D)
+			return GL_TEXTURE_2D_MULTISAMPLE;
+		else if (viewType == IMAGE_VIEW_TYPE_2D_ARRAY)
+			return GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+		else
+			throw std::runtime_error("wrong image view type");
+	}
+	else
+		return glImageViewTypeArray[static_cast<size_t>(viewType)];
 }

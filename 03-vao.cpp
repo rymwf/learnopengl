@@ -223,7 +223,7 @@ class Hello
 		std::vector<VertexAttributeDescription> attributeDescriptions;
 		attributeDescriptions.insert(attributeDescriptions.end(), attributeDescriptions0.begin(), attributeDescriptions0.end());
 
-		VertexInputStateDescription vertexInputStateDescription{
+		VertexInputStateCreateInfo vertexInputStateDescription{
 			bindingDescriptions.size(),
 			bindingDescriptions.data(),
 			attributeDescriptions.size(),

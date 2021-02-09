@@ -15,6 +15,7 @@
 #include <fstream>
 #include <vector>
 #include <chrono>
+#include <thread>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -270,7 +271,7 @@ struct VertexBindingDescription
 	uint32_t divisor; //attributes advance once per divior instances,when 0, advance per vertex
 };
 
-struct VertexInputStateDescription
+struct VertexInputStateCreateInfo
 {
 	uint32_t vertexBindingDescriptionCount;
 	const VertexBindingDescription *pVertexBindingDescriptions;
@@ -282,6 +283,7 @@ struct GraphicsPipelineCreateInfo
 {
 	uint32_t stageCount;
 	const PipelineShaderStageCreateInfo *pStages;
+	const VertexInputStateCreateInfo *pVertexInputState;
 };
 
 struct Vertex
@@ -358,7 +360,7 @@ void createBuffer(const BufferCreateInfo &createInfo, const void *pData, BufferH
  * @param indexBuffer  if indexBuffer is 0, then should call draw index
  * @param pVertexArray 
  */
-void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
+void createVertexArray(const VertexInputStateCreateInfo &vertexInputDescription,
 					   const std::vector<BufferHandle> &vertexBuffers,
 					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray);

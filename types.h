@@ -9,6 +9,7 @@
  */
 #pragma once
 #include <glad/glad.h>
+#include <stdexcept>
 
 typedef unsigned int Flags;
 
@@ -152,8 +153,8 @@ enum DescriptorType
 	DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1, //sampler2D
 	DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,			//texture2D (vulkan)
 	DESCRIPTOR_TYPE_STORAGE_IMAGE = 3,			//image2D
-	DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,	//samplerbuffer	(no sampler,seems same as imagebuffer)
-	DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,	//imagebuffer
+	DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,	//samplerbuffer	(access to buffer texture,can only be accessed with texelFetch function) ,textureBuffer(vulkan)
+	DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,	//imagebuffer (access to buffer texture)
 	DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,			//uniform block
 	DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,			//buffer block
 	DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
@@ -279,4 +280,4 @@ GLenum Map(Filter filter);
 GLenum Map(ImageTiling tiling);
 GLenum Map(ImageLayout imageLayout);
 GLenum Map(BufferMutableStorageUsage usage);
-GLenum Map(ImageViewType viewType);
+GLenum Map(ImageViewType viewType, bool multisample);

@@ -459,7 +459,7 @@ void createBuffer(const BufferCreateInfo &createInfo, const void *pData, BufferH
 		glBufferStorage(GL_ARRAY_BUFFER, createInfo.size, pData, createInfo.storageFlags);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
-void createVertexArray(const VertexInputStateDescription &vertexInputDescription,
+void createVertexArray(const VertexInputStateCreateInfo &vertexInputDescription,
 					   const std::vector<BufferHandle> &vertexBuffers,
 					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray)
@@ -774,4 +774,9 @@ void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, Ima
 	else if (createInfo.borderColor.dataType == DATA_TYPE_FLOAT)
 		glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.float32);
 	glBindTexture(target, 0);
+}
+void createProgramPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline)
+{
+	glGenProgramPipelines(1, pPipeline);
+
 }
