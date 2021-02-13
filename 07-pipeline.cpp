@@ -130,13 +130,17 @@ class Hello
 
 		listGLInfo();
 
+		createDescriptorSets();
+
 		createVertexBuffer();
 		createIndexBuffer();
+
+		createPipelines(); //create vao need pipeline createinfo
+
 		createUboBuffer();
-		createPipelines();
 		createDrawCommandBuffer();
 		createTextureImage();
-		createDescriptorSets();
+		updateDescriptors();
 	}
 	void mainLoop()
 	{
@@ -363,7 +367,10 @@ class Hello
 		createDescriptorSetLayout(setLayoutCreateInfo, descriptorSetLayout);
 
 		createDescriptorSet({descriptorSetLayout}, descriptorSet);
+	}
 
+	void updateDescriptors()
+	{
 		SamplerCreateInfo samplerCreateInfo{
 			FILTER_NEAREST,
 			FILTER_NEAREST,
