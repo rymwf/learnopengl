@@ -45,6 +45,7 @@ typedef uint32_t BufferHandle;
 typedef uint32_t VertexArrayHandle;
 typedef uint32_t SamplerHandle;
 typedef uint32_t ImageHandle;
+typedef uint32_t BufferViewHandle;
 typedef uint32_t MemoryHandle;	  //need GL_EXT_memory_object
 typedef uint32_t SemaphoreHandle; //need GL_EXT_semaphore
 
@@ -170,31 +171,138 @@ struct ImageViewCreateInfo
 
 struct DescriptorSetLayoutBinding
 {
-	uint32_t binding;
+	uint32_t binding; //shader binding
 	DescriptorType descriptorType;
-	uint32_t descriptorCount; //array
-	ShaderStageFlags stageFlags;
-	const SamplerHandle *pImmutableSamplers;
+	uint32_t descriptorCount;	 //array
+	ShaderStageFlags stageFlags; //vulkan
+	std::vector<SamplerHandle> immutableSamplers;
 };
 
-struct DescriptorSetLayout
+struct DescriptorImageInfo
 {
-	uint32_t bindingCount;
-	const DescriptorSetLayout *pDescriptorSetLayouts;
+	//SamplerHandle sampler;
+	SamplerCreateInfo samplerCreateInfo;
+	ImageHandle imageView;
+	//ImageLayout imageLayout;	//TODO:
+};
+struct DescriptorBufferInfo
+{
+	BufferHandle buffer;
+	uint32_t offset;
+	uint32_t range;
 };
 
+struct DescriptorSetLayoutCreateInfo
+{
+	std::vector<DescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+};
+struct DescriptorSetLayout_T
+{
+	DescriptorSetLayoutCreateInfo _createInfo;
+};
+typedef DescriptorSetLayout_T *DescriptorSetLayout;
+
+struct DescriptorSet_T
+{
+	struct BufferObj
+	{
+		DescriptorSetLayoutBinding binding;
+		std::vector<DescriptorBufferInfo> buffersInfo;
+	};
+	struct ImageObj
+	{
+		DescriptorSetLayoutBinding binding;
+		std::vector<ImageHandle> imageViews;
+		ImageViewType imageViewType;
+		bool multisample;
+	};
+	std::vector<BufferObj> _buffers;
+	std::vector<ImageObj> _images;
+	DescriptorSet_T(const std::vector<DescriptorSetLayout> &layouts)
+	{
+		for (auto layout : layouts)
+		{
+			for (const auto &layoutBinding : layout->_createInfo.descriptorSetLayoutBindings)
+			{
+				if (layoutBinding.descriptorType == DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+					layoutBinding.descriptorType == DESCRIPTOR_TYPE_STORAGE_BUFFER)
+				{
+					_buffers.emplace_back(BufferObj{layoutBinding, std::vector<DescriptorBufferInfo>(layoutBinding.descriptorCount)});
+				}
+				else if (
+					layoutBinding.descriptorType == DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+					layoutBinding.descriptorType == DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+					layoutBinding.descriptorType == DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+					layoutBinding.descriptorType == DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER ||
+					layoutBinding.descriptorType == DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+				{
+					_images.emplace_back(ImageObj{layoutBinding, std::vector<ImageHandle>(layoutBinding.descriptorCount)});
+				}
+				else
+				{
+					throw std::runtime_error("descriptor not supported yet");
+				}
+			}
+		}
+	}
+	void Bind()
+	{
+		for (auto &buffer : _buffers)
+		{
+			for (uint32_t i = 0; i < buffer.binding.descriptorCount; ++i)
+				glBindBufferRange(
+					GL_UNIFORM_BUFFER,
+					buffer.binding.binding + i,
+					buffer.buffersInfo[i].buffer,
+					buffer.buffersInfo[i].offset,
+					buffer.buffersInfo[i].range);
+		}
+		for (auto &image : _images)
+		{
+			for (uint32_t i = 0; i < image.binding.descriptorCount; ++i)
+			{
+				glActiveTexture(GL_TEXTURE0 + image.binding.binding + i);
+				glBindTexture(Map(image.imageViewType, image.multisample), image.imageViews[i]);
+			}
+		}
+	}
+};
+typedef DescriptorSet_T *DescriptorSet;
+
+struct WriteDescriptorSet
+{
+	DescriptorSet dstSet;
+	uint32_t dstBinding;
+	uint32_t dstArrayElement;
+	DescriptorType descriptorType;
+	std::vector<DescriptorImageInfo> imagesInfo;
+	ImageViewType viewType;
+	bool multisample;
+	std::vector<DescriptorBufferInfo> buffersInfo;
+	std::vector<BufferViewHandle> texelBufferView; //TODO: buffer texture
+};
+struct CopyDescriptorSet
+{
+	//TODO:
+};
 //vulkan only
 struct PushConstantRange
 {
+	ShaderStageFlags stageFlags;
+	uint32_t offset;
+	uint32_t size;
 };
 
 struct PipelineLayoutCreateInfo
 {
-	uint32_t setLayoutCount; //opengl must be 1
-	const DescriptorSetLayout *pSetLayouts;
-	uint32_t pushConstantRangeCount;
-	const PushConstantRange *pPushConstantRanges;
+	std::vector<DescriptorSetLayout> setLayouts; //opengl must be 1
+	std::vector<PushConstantRange> pushConstantRanges;
 };
+struct PipelineLayout_T
+{
+	PipelineLayoutCreateInfo _createInfo;
+};
+typedef PipelineLayout_T *PipelineLayout;
 
 struct DrawIndirectCommand
 {
@@ -226,30 +334,27 @@ struct BufferCreateInfo
 
 struct SpecializationInfo
 {
-	uint32_t numSpecializationConstants;
-	const uint32_t *pConstantIDs;
-	const uint32_t *pConstantValues;
+	std::vector<uint32_t> constantIDs;
+	std::vector<uint32_t> constantValues;
 };
 
 struct PipelineShaderStageCreateInfo
 {
 	ShaderStageFlagBits stage;
 	ShaderHandle shaderHandle;
-	const char *pEntryName;
-	const SpecializationInfo *pSecializationInfo;
+	std::string entryName;
+	SpecializationInfo specializationInfo;
 };
 
 struct ShaderCreateInfo
 {
 	ShaderStageFlagBits stage;
-	size_t codeSize;
-	const char *pCode;
+	std::string code;
 };
 
 struct ProgramCreateInfo
 {
-	uint32_t shaderCount;
-	const ShaderHandle *pShaders;
+	std::vector<ShaderHandle> shaders;
 	bool separable;
 	bool retrievable;
 };
@@ -273,17 +378,15 @@ struct VertexBindingDescription
 
 struct VertexInputStateCreateInfo
 {
-	uint32_t vertexBindingDescriptionCount;
-	const VertexBindingDescription *pVertexBindingDescriptions;
-	uint32_t vertexAttributeDescriptionCount;
-	const VertexAttributeDescription *pVertexAttributeDescriptions;
+	std::vector<VertexBindingDescription> vertexBindingDescriptions;
+	std::vector<VertexAttributeDescription> vertexAttributeDescriptions;
 };
 
 struct GraphicsPipelineCreateInfo
 {
-	uint32_t stageCount;
-	const PipelineShaderStageCreateInfo *pStages;
-	const VertexInputStateCreateInfo *pVertexInputState;
+	std::vector<PipelineShaderStageCreateInfo> stages;
+	VertexInputStateCreateInfo vertexInputState;
+	PipelineLayout layout;
 };
 
 struct Vertex
@@ -348,7 +451,7 @@ void createShader(const ShaderCreateInfo &createInfo, ShaderHandle *pShader);
  */
 void createShaderBinary(const ShaderCreateInfo &createInfo, ShaderHandle *pShader);
 void createProgram(const ProgramCreateInfo &createInfo, ProgramHandle *pProgram);
-void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline, ProgramHandle *pPrograms);
+void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline, std::vector<ProgramHandle> *pPrograms);
 
 void createBuffer(const BufferCreateInfo &createInfo, const void *pData, BufferHandle *pBuffer);
 
@@ -373,4 +476,14 @@ void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, Im
 
 void updateImageSubData(ImageHandle image, ImageType imageType, const ImageSubData &imageSubData);
 
-void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType);
+void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType, bool multisample = false);
+
+void createDescriptorSetLayout(const DescriptorSetLayoutCreateInfo &createInfo, DescriptorSetLayout &outSetLayout);
+
+void destroyDescriptorSetLayout(DescriptorSetLayout &setLayout);
+
+void createDescriptorSet(const std::vector<DescriptorSetLayout> &descriptorSetLayouts, DescriptorSet &descriptorSet);
+
+void destroyDescriptorSet(DescriptorSet descriptorSet);
+
+void updateDescriptorSets(const std::vector<WriteDescriptorSet> &descriptorWrites, const std::vector<CopyDescriptorSet> &descriptorCopy);

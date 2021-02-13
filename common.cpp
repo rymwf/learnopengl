@@ -275,7 +275,8 @@ void createShader(const ShaderCreateInfo &createInfo, ShaderHandle *pShader)
 	*pShader = glCreateShader(shaderType);
 	if (*pShader)
 	{
-		glShaderSource(*pShader, 1, &createInfo.pCode, NULL);
+		const char *code = createInfo.code.data();
+		glShaderSource(*pShader, 1, &code, NULL);
 		glCompileShader(*pShader);
 		glReleaseShaderCompiler();
 #ifndef NODEBUG
@@ -359,7 +360,7 @@ void createShaderBinary(const ShaderCreateInfo &createInfo, ShaderHandle *pShade
 	*pShader = glCreateShader(shaderType);
 	if (*pShader)
 	{
-		glShaderBinary(1, pShader, GL_SHADER_BINARY_FORMAT_SPIR_V, createInfo.pCode, createInfo.codeSize);
+		glShaderBinary(1, pShader, GL_SHADER_BINARY_FORMAT_SPIR_V, createInfo.code.data(), createInfo.code.size());
 	}
 	else
 		throw std::runtime_error("failed to create shader");
@@ -372,8 +373,8 @@ void createProgram(const ProgramCreateInfo &createInfo, ProgramHandle *pProgram)
 	{
 		glProgramParameteri(*pProgram, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, createInfo.retrievable);
 		glProgramParameteri(*pProgram, GL_PROGRAM_SEPARABLE, createInfo.separable);
-		for (uint32_t i = 0; i < createInfo.shaderCount; ++i)
-			glAttachShader(*pProgram, createInfo.pShaders[i]);
+		for (auto shader : createInfo.shaders)
+			glAttachShader(*pProgram, shader);
 		glLinkProgram(*pProgram);
 #ifndef NODEBUG
 		GLint success;
@@ -397,7 +398,7 @@ void createProgram(const ProgramCreateInfo &createInfo, ProgramHandle *pProgram)
 	}
 }
 
-void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline, ProgramHandle *pPrograms)
+void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline, std::vector<ProgramHandle> *pPrograms)
 {
 	if (GLVersion.major * 10 + GLVersion.minor > 41)
 	{
@@ -412,16 +413,15 @@ void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, Pipeli
 #endif
 	}
 	glBindProgramPipeline(*pPipeline);
-	for (uint32_t j = 0; j < createInfo.stageCount; ++j)
+	for (auto &stageCreateInfo : createInfo.stages)
 	{
-		auto &stageCreateInfo = createInfo.pStages[j];
 		//equal to compilation
 		glSpecializeShader(
 			stageCreateInfo.shaderHandle,
-			stageCreateInfo.pEntryName,
-			stageCreateInfo.pSecializationInfo->numSpecializationConstants,
-			stageCreateInfo.pSecializationInfo->pConstantIDs,
-			stageCreateInfo.pSecializationInfo->pConstantValues);
+			stageCreateInfo.entryName.data(),
+			stageCreateInfo.specializationInfo.constantIDs.size(),
+			stageCreateInfo.specializationInfo.constantIDs.data(),
+			stageCreateInfo.specializationInfo.constantValues.data());
 
 		// Specialization is equivalent to compilation.
 		GLint isCompiled = 0;
@@ -443,8 +443,9 @@ void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, Pipeli
 			// Use the infoLog as you see fit.
 			throw std::runtime_error("failed to specialize shader");
 		}
-		createProgram({1, &stageCreateInfo.shaderHandle}, &pPrograms[j]);
-		glUseProgramStages(*pPipeline, stageCreateInfo.stage, pPrograms[j]);
+		pPrograms->emplace_back(0);
+		createProgram({{stageCreateInfo.shaderHandle}, true}, &pPrograms->back());
+		glUseProgramStages(*pPipeline, stageCreateInfo.stage, pPrograms->back());
 	}
 }
 void createBuffer(const BufferCreateInfo &createInfo, const void *pData, BufferHandle *pBuffer)
@@ -459,27 +460,23 @@ void createBuffer(const BufferCreateInfo &createInfo, const void *pData, BufferH
 		glBufferStorage(GL_ARRAY_BUFFER, createInfo.size, pData, createInfo.storageFlags);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
-void createVertexArray(const VertexInputStateCreateInfo &vertexInputDescription,
+void createVertexArray(const VertexInputStateCreateInfo &vertexInputStateCreateInfo,
 					   const std::vector<BufferHandle> &vertexBuffers,
 					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray)
 {
-	std::vector<std::pair<int, int>> bindingDescriptions(vertexInputDescription.vertexBindingDescriptionCount);
+	std::vector<std::pair<int, int>> bindingDescriptions(vertexInputStateCreateInfo.vertexAttributeDescriptions.size());
 
-	for (uint32_t i = 0; i < vertexInputDescription.vertexBindingDescriptionCount; ++i)
-	{
-		const auto &e = vertexInputDescription.pVertexBindingDescriptions[i];
+	for (auto &e : vertexInputStateCreateInfo.vertexBindingDescriptions)
 		bindingDescriptions[e.binding] = {e.stride, e.divisor};
-	}
 
 	glGenVertexArrays(1, pVertexArray);
 	if (*pVertexArray == 0)
 		throw std::runtime_error("failed to create vertex array object");
 	glBindVertexArray(*pVertexArray);
 
-	for (uint32_t i = 0; i < vertexInputDescription.vertexAttributeDescriptionCount; ++i)
+	for (auto &attrib : vertexInputStateCreateInfo.vertexAttributeDescriptions)
 	{
-		const auto &attrib = vertexInputDescription.pVertexAttributeDescriptions[i];
 		glBindBuffer(GL_ARRAY_BUFFER, vertexBuffers[attrib.binding]);
 		glEnableVertexAttribArray(attrib.location);
 		glVertexAttribPointer(
@@ -735,9 +732,13 @@ void updateImageSubData(ImageHandle image, ImageType imageType, const ImageSubDa
 	glBindTexture(target, 0);
 };
 
-void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType)
+void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType, bool multisample)
 {
-	//multisample texture do not support sampler parameter
+	if (multisample == true)
+	{
+		LOG("multisample texture do not support sampler parameter");
+		return;
+	}
 	GLenum target = Map(imageViewType, false);
 	glBindTexture(target, image);
 
@@ -775,8 +776,70 @@ void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, Ima
 		glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.float32);
 	glBindTexture(target, 0);
 }
-void createProgramPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline)
-{
-	glGenProgramPipelines(1, pPipeline);
 
+void createDescriptorSetLayout(const DescriptorSetLayoutCreateInfo &createInfo, DescriptorSetLayout &outSetLayout)
+{
+	outSetLayout = new DescriptorSetLayout_T{createInfo};
+}
+void destroyDescriptorSetLayout(DescriptorSetLayout &setLayout)
+{
+	delete setLayout;
+}
+
+void createDescriptorSet(const std::vector<DescriptorSetLayout> &descriptorSetLayouts, DescriptorSet &descriptorSet)
+{
+	descriptorSet = new DescriptorSet_T{descriptorSetLayouts};
+}
+
+void destroyDescriptorSet(DescriptorSet descriptorSet)
+{
+	delete descriptorSet;
+}
+
+void updateDescriptorSets(const std::vector<WriteDescriptorSet> &descriptorWrites, const std::vector<CopyDescriptorSet> &descriptorCopy)
+{
+	for (auto &writeSet : descriptorWrites)
+	{
+		if (writeSet.descriptorType == DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+			writeSet.descriptorType == DESCRIPTOR_TYPE_STORAGE_BUFFER)
+		{
+			for (auto &buffer : writeSet.dstSet->_buffers)
+			{
+				if (buffer.binding.binding == writeSet.dstBinding)
+				{
+					std::copy(writeSet.buffersInfo.begin(), writeSet.buffersInfo.end(), buffer.buffersInfo.begin() + writeSet.dstArrayElement);
+					break;
+				}
+			}
+		}
+		else if (
+			writeSet.descriptorType == DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+			writeSet.descriptorType == DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+			writeSet.descriptorType == DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+			writeSet.descriptorType == DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER ||
+			writeSet.descriptorType == DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+		{
+			for (auto &image : writeSet.dstSet->_images)
+			{
+				if (image.binding.binding == writeSet.dstBinding)
+				{
+					for (int i = 0, len = writeSet.imagesInfo.size(); i < len; ++i)
+					{
+						setImageSampler(
+							writeSet.imagesInfo[i].samplerCreateInfo,
+							writeSet.imagesInfo[i].imageView,
+							writeSet.viewType,
+							writeSet.multisample);
+						image.imageViews[i + writeSet.dstArrayElement] = writeSet.imagesInfo[i].imageView;
+						image.imageViewType = writeSet.viewType;
+						image.multisample = writeSet.multisample;
+					}
+					break;
+				}
+			}
+		}
+	}
+	//for (auto &copySet : descriptorCopy)
+	//{
+	//}
 }

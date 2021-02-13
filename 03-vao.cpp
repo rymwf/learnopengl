@@ -175,13 +175,11 @@ class Hello
 
 			ShaderCreateInfo vertShaderCreateInfo{
 				SHADER_STAGE_VERTEX_BIT,
-				vertCode.size(),
-				vertCode.data()};
+				vertCode};
 
 			ShaderCreateInfo fragShaderCreateInfo{
 				SHADER_STAGE_FRAGMENT_BIT,
-				fragCode.size(),
-				fragCode.data()};
+				fragCode};
 
 			createShaderBinary(vertShaderCreateInfo, &vertShader);
 			glSpecializeShader(vertShader, "main", 0, nullptr, nullptr);
@@ -194,19 +192,16 @@ class Hello
 			auto fragCode = readFile(fragFile);
 			ShaderCreateInfo vertShaderCreateInfo{
 				SHADER_STAGE_VERTEX_BIT,
-				vertCode.size(),
-				vertCode.data()};
+				vertCode};
 
 			ShaderCreateInfo fragShaderCreateInfo{
 				SHADER_STAGE_FRAGMENT_BIT,
-				fragCode.size(),
-				fragCode.data()};
+				fragCode};
 
 			createShader(vertShaderCreateInfo, &vertShader);
 			createShader(fragShaderCreateInfo, &fragShader);
 		}
-		ShaderHandle shaders[] = {vertShader, fragShader};
-		createProgram({2, shaders}, &programId);
+		createProgram({{vertShader, fragShader}}, &programId);
 	}
 
 	void createVertexBuffer()
@@ -224,11 +219,8 @@ class Hello
 		attributeDescriptions.insert(attributeDescriptions.end(), attributeDescriptions0.begin(), attributeDescriptions0.end());
 
 		VertexInputStateCreateInfo vertexInputStateDescription{
-			bindingDescriptions.size(),
-			bindingDescriptions.data(),
-			attributeDescriptions.size(),
-			attributeDescriptions.data(),
-		};
+			std::move(bindingDescriptions),
+			std::move(attributeDescriptions)};
 		createVertexArray(vertexInputStateDescription, {vertexBuffer}, 0, &vertexArray);
 	}
 	void createDrawCommandBuffer()

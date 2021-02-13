@@ -175,8 +175,10 @@ class Hello
 		updateUboBuffers();
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
-		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
+		//glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
+		glBindBufferBase(GL_UNIFORM_BUFFER, 1, uboMVPBuffer);
 
+		glActiveTexture(GL_TEXTURE0 + 1);
 		//glBindTexture(GL_TEXTURE_2D_ARRAY, testImage);
 		if (samples > SAMPLE_COUNT_1_BIT)
 			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, testImageView0);
@@ -292,13 +294,11 @@ class Hello
 
 			ShaderCreateInfo vertShaderCreateInfo{
 				SHADER_STAGE_VERTEX_BIT,
-				vertCode.size(),
-				vertCode.data()};
+				vertCode};
 
 			ShaderCreateInfo fragShaderCreateInfo{
 				SHADER_STAGE_FRAGMENT_BIT,
-				fragCode.size(),
-				fragCode.data()};
+				fragCode};
 
 			createShaderBinary(vertShaderCreateInfo, &vertShader);
 			glSpecializeShader(vertShader, "main", 0, nullptr, nullptr);
@@ -311,19 +311,16 @@ class Hello
 			auto fragCode = readFile(fragFile);
 			ShaderCreateInfo vertShaderCreateInfo{
 				SHADER_STAGE_VERTEX_BIT,
-				vertCode.size(),
-				vertCode.data()};
+				vertCode};
 
 			ShaderCreateInfo fragShaderCreateInfo{
 				SHADER_STAGE_FRAGMENT_BIT,
-				fragCode.size(),
-				fragCode.data()};
+				fragCode};
 
 			createShader(vertShaderCreateInfo, &vertShader);
 			createShader(fragShaderCreateInfo, &fragShader);
 		}
-		ShaderHandle shaders[] = {vertShader, fragShader};
-		createProgram({2, shaders}, &programId);
+		createProgram({{vertShader, fragShader}}, &programId);
 	}
 
 	void createVertexBuffer()
@@ -345,11 +342,8 @@ class Hello
 		attributeDescriptions.insert(attributeDescriptions.end(), attributeDescriptions0.begin(), attributeDescriptions0.end());
 
 		VertexInputStateCreateInfo vertexInputStateDescription{
-			bindingDescriptions.size(),
-			bindingDescriptions.data(),
-			attributeDescriptions.size(),
-			attributeDescriptions.data(),
-		};
+			std::move(bindingDescriptions),
+			std::move(attributeDescriptions)};
 		createVertexArray(vertexInputStateDescription, {vertexBuffer}, indexBuffer, &vertexArray);
 	}
 
