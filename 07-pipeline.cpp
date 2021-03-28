@@ -16,14 +16,14 @@
 
 int WIDTH = 800, HEIGHT = 600;
 
-constexpr char *testImagePath = "./assets/textures/Lenna_test.jpg";
+const char *testImagePath = "./assets/textures/Lenna_test.jpg";
 
 SampleCountFlagBits samples = SAMPLE_COUNT_1_BIT;
 
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
-constexpr char *vertFile = SHADER_PATH "06.vert";
-constexpr char *fragFile = SHADER_PATH "06.frag";
+const char *vertFile = SHADER_PATH "06.vert";
+const char *fragFile = SHADER_PATH "06.frag";
 
 //std140, round to base alignment of vec4
 struct UBO_MVP
@@ -117,8 +117,13 @@ class Hello
 	}
 	void initOpengl()
 	{
-		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
-			throw std::runtime_error("failed to load glad");
+		GLenum err = glewInit();
+		if (GLEW_OK != err)
+		{
+			/* Problem: glewInit failed, something is seriously wrong. */
+			fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+			THROW("failed to init glew");
+		}
 
 #ifndef NODEBUG
 		EnableDebugOutput(this);
@@ -189,6 +194,8 @@ class Hello
 		resize();
 		glClear(GL_COLOR_BUFFER_BIT);
 		updateUboBuffers();
+		glBindVertexArray(0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
 		glBindProgramPipeline(pipeline);
 		glBindVertexArray(vertexArray);
 		descriptorSet->Bind();
@@ -210,15 +217,15 @@ class Hello
 		//glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
 		//glDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL);
 		//4
-		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
-		//		if(GLVersion.major*10+GLVersion.minor>=43)
-		//		{
-		//			glMultiDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
-		//		}else{
-		//#ifdef GL_AMD_multi_draw_indirect
-		//			glMultiDrawArraysIndirectAMD(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
-		//#endif
-		//		}
+//				glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
+//				if (GLEW_VERSION_4_3)
+//				{
+//					glMultiDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
+//				}else{
+//		#ifdef GL_AMD_multi_draw_indirect
+//					glMultiDrawArraysIndirectAMD(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
+//		#endif
+//				}
 		//5
 		//		if (GLVersion.major * 10 + GLVersion.minor >= 46)
 		//		{
@@ -257,7 +264,7 @@ class Hello
 		//#endif
 		//		}
 		//5
-		if (GLVersion.major * 10 + GLVersion.minor >= 46)
+		if (GLEW_VERSION_4_6)
 		{
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
 			glBindBuffer(GL_PARAMETER_BUFFER, drawIndexedIndirectCmdCountBuffer);
@@ -331,7 +338,7 @@ class Hello
 		};
 
 		std::vector<VertexBindingDescription> bindingDescriptions{
-			Vertex::getVertexBindingDescription(0)};
+			Vertex::getVertexBindingDescription()};
 
 		auto attributeDescriptions0 = Vertex::getVertexAttributeDescription(0, 0);
 		std::vector<VertexAttributeDescription> attributeDescriptions;

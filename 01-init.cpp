@@ -21,6 +21,7 @@ class Hello
 	{
 		glfwInit();
 
+
 		glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 		//set gl versiont
@@ -45,8 +46,13 @@ class Hello
 	}
 	void initOpengl()
 	{
-		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
-			throw std::runtime_error("failed to load glad");
+		GLenum err = glewInit();
+		if (GLEW_OK != err)
+		{
+			/* Problem: glewInit failed, something is seriously wrong. */
+			fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+			THROW("failed to init glew");
+		}
 
 		listGLInfo();
 #ifndef NODEBUG

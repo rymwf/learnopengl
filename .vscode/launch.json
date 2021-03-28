@@ -12,7 +12,8 @@
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
+			"environment": [],
+			"console":"internalConsole"
 //            "preLaunchTask": "C/C++: cl.exe build active file"
         }
     ]

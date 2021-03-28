@@ -13,8 +13,8 @@ constexpr GLuint WIDTH = 800, HEIGHT = 600;
 
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
-constexpr char *vertFile = SHADER_PATH "02.vert";
-constexpr char *fragFile = SHADER_PATH "02.frag";
+const char *vertFile = SHADER_PATH "02.vert";
+const char *fragFile = SHADER_PATH "02.frag";
 
 class Hello
 {
@@ -52,8 +52,13 @@ class Hello
 	}
 	void initOpengl()
 	{
-		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
-			throw std::runtime_error("failed to load glad");
+		GLenum err = glewInit();
+		if (GLEW_OK != err)
+		{
+			/* Problem: glewInit failed, something is seriously wrong. */
+			fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+			THROW("failed to init glew");
+		}
 
 		listGLInfo();
 
@@ -116,7 +121,7 @@ class Hello
 
 	void createTestProgram()
 	{
-		if (GLVersion.major * 10 + GLVersion.minor > 45 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
+		if (GLEW_VERSION_4_5 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
 		{
 			auto vertCode = readFile((std::string(vertFile) + ".spv").c_str());
 			auto fragCode = readFile((std::string(fragFile) + ".spv").c_str());

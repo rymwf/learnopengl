@@ -20,10 +20,10 @@ const char *testImagePath = "./assets/textures/Lenna_test.jpg";
 
 SampleCountFlagBits samples = SAMPLE_COUNT_1_BIT;
 
-GLint glVersion{46}; //set glversion,such as 33 mean use version 33 , if 0, use latest
+GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
-const char *vertFile = SHADER_PATH "06.vert";
-const char *fragFile = SHADER_PATH "06.frag";
+const char *vertFile = SHADER_PATH "08.vert";
+const char *fragFile = SHADER_PATH "08.frag";
 
 //std140, round to base alignment of vec4
 struct UBO_MVP
@@ -52,7 +52,12 @@ std::vector<uint32_t> indices{
 	0, 1, 2, 2, 1, 3};
 
 std::vector<DrawIndirectCommand> drawIndirectCmds{{4, 1, 0, 0}};
-std::vector<DrawIndexedIndirectCommand> drawIndexedIndirectCmds{{6, 1, 0, 0, 0}};
+std::vector<DrawIndexedIndirectCommand> drawIndexedIndirectCmds{{6, 2, 0, 0, 0}};
+
+std::vector<InstanceAttribute> instanceAttributes{
+	{glm::mat4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 1)},
+	{glm::mat4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1)},
+};
 
 class Hello
 {
@@ -67,7 +72,9 @@ class Hello
 
 	ShaderHandle vertShader;
 	ShaderHandle fragShader;
-	ProgramHandle programId;
+	std::vector<ProgramHandle> programs;
+	PipelineHandle pipeline;
+
 	VertexArrayHandle vertexArray;
 	BufferHandle vertexBuffer;
 	BufferHandle indexBuffer;
@@ -76,12 +83,15 @@ class Hello
 	BufferHandle drawIndexedIndirectCmdBuffer;
 	BufferHandle drawIndexedIndirectCmdCountBuffer;
 	BufferHandle uboMVPBuffer;
+	BufferHandle instanceBuffer;
 
-	MemoryHandle testImageMemory;
 	ImageHandle testImage;
-	ImageViewHandle testImageView0;
-	ImageViewHandle testImageView1;
+	ImageHandle testImageView0;
+	ImageHandle testImageView1;
 	SamplerHandle samplers[4];
+
+	DescriptorSetLayout descriptorSetLayout;
+	DescriptorSet descriptorSet;
 
 	void initWindow()
 	{
@@ -97,8 +107,8 @@ class Hello
 #ifndef NDEBUG
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
 #endif
-		glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
 		glfwWindowHint(GLFW_SRGB_CAPABLE, GL_TRUE);
+		glfwWindowHint(GLFW_SAMPLES, 16);
 
 		window = glfwCreateWindow(WIDTH, HEIGHT, __FILE__, nullptr, nullptr);
 		if (!window)
@@ -109,7 +119,7 @@ class Hello
 		glfwMakeContextCurrent(window);
 		glfwSetWindowUserPointer(window, this);
 		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-		glfwSwapInterval(0); //enable v sync
+		glfwSwapInterval(1); //enable v sync
 	}
 	void initOpengl()
 	{
@@ -127,18 +137,22 @@ class Hello
 
 		glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 		glEnable(GL_FRAMEBUFFER_SRGB);
-		//glEnable(GL_MULTISAMPLE);
-		glClipControl(GL_UPPER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
+		glEnable(GL_MULTISAMPLE);
 
 		listGLInfo();
 
-		createTestProgram();
+		createDescriptorSets();
+
 		createVertexBuffer();
 		createIndexBuffer();
+		createInstanceBuffer();
+
+		createPipelines(); //create vao need pipeline createinfo
+
 		createUboBuffer();
-		createVAO();
 		createDrawCommandBuffer();
 		createTextureImage();
+		updateDescriptors();
 	}
 	void mainLoop()
 	{
@@ -151,12 +165,14 @@ class Hello
 
 			glfwPollEvents();
 			drawFrame();
-			//	glfwSwapBuffers(window);
+			glfwSwapBuffers(window);
 		}
 	}
 	void cleanup()
 	{
-		glDeleteMemoryObjectsEXT(1, &testImageMemory);
+		destroyDescriptorSetLayout(descriptorSetLayout);
+		destroyDescriptorSet(descriptorSet);
+
 		glDeleteTextures(1, &testImage);
 		glDeleteTextures(1, &testImageView0);
 		glDeleteTextures(1, &testImageView1);
@@ -169,9 +185,13 @@ class Hello
 		glDeleteBuffers(1, &vertexBuffer);
 		glDeleteBuffers(1, &indexBuffer);
 		glDeleteVertexArrays(1, &vertexArray);
+
+		glDeleteProgramPipelines(1, &pipeline);
+		for (auto e : programs)
+			glDeleteProgram(e);
+
 		glDeleteShader(vertShader);
 		glDeleteShader(fragShader);
-		glDeleteProgram(programId);
 
 		glfwDestroyWindow(window);
 		glfwTerminate();
@@ -181,76 +201,16 @@ class Hello
 		resize();
 		glClear(GL_COLOR_BUFFER_BIT);
 		updateUboBuffers();
-		glUseProgram(programId);
+
+		glBindProgramPipeline(pipeline);
 		glBindVertexArray(vertexArray);
-		//glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
-		glBindBufferBase(GL_UNIFORM_BUFFER, 1, uboMVPBuffer);
+		GLintptr offsets[]{0, 0};
+		GLsizei strides[]{sizeof(Vertex), sizeof(InstanceAttribute)};
+		BufferHandle buffers[]{vertexBuffer, instanceBuffer};
+		glBindVertexBuffers(0, 2, buffers, offsets, strides);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+		descriptorSet->Bind();
 
-		glActiveTexture(GL_TEXTURE0 + 1);
-		if (samples > SAMPLE_COUNT_1_BIT)
-			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, testImageView0);
-		else
-		{
-			glBindTexture(GL_TEXTURE_2D, testImageView0);
-		}
-		glActiveTexture(GL_TEXTURE0 + 2);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, testImage);
-		//glBindTexture(GL_TEXTURE_2D, testImageView1);
-
-		//1
-		//glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-		//2
-		//glDrawArraysIndirect(GL_TRIANGLE_STRIP, &drawIndirectCmd);
-		//3
-		//glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
-		//glDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL);
-		//4
-		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
-		//		if(GLVersion.major*10+GLVersion.minor>=43)
-		//		{
-		//			glMultiDrawArraysIndirect(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
-		//		}else{
-		//#ifdef GL_AMD_multi_draw_indirect
-		//			glMultiDrawArraysIndirectAMD(GL_TRIANGLE_STRIP, NULL, drawIndirectCmds.size(), sizeof(DrawIndirectCommand));
-		//#endif
-		//		}
-		//5
-		//		if (GLVersion.major * 10 + GLVersion.minor >= 46)
-		//		{
-		//			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
-		//			glBindBuffer(GL_PARAMETER_BUFFER, drawIndirectCmdCountBuffer);
-		//			glMultiDrawArraysIndirectCount(GL_TRIANGLE_STRIP, NULL, 0, drawIndirectCmds.size(), sizeof(DrawIndirectCommand)); //disgusting
-		//		}
-		//		else
-		//		{
-		//#ifdef GL_ARB_indirect_parameters
-		//			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndirectCmdBuffer);
-		//			glBindBuffer(GL_PARAMETER_BUFFER_ARB, drawIndirectCmdCountBuffer);
-		//			glMultiDrawArraysIndirectCountARB(GL_TRIANGLE_STRIP, NULL, 0, drawIndirectCmds.size(), sizeof(DrawIndirectCommand)); //disgusting
-		//#endif
-		//		}
-
-		//draw index
-
-		//1
-		//glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
-		//2
-		//glDrawElementsIndirect(GL_TRIANGLES,GL_UNSIGNED_INT,&drawIndexedIndirectCmd);
-		//3
-		//glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
-		//glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, NULL);
-		//4
-		//		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
-		//		if (GLVersion.major * 10 + GLVersion.minor >= 43)
-		//		{
-		//			glMultiDrawElementsIndirect(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
-		//		}
-		//		else
-		//		{
-		//#ifdef GL_AMD_multi_draw_indirect
-		//			glMultiDrawElementsIndirectAMD(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
-		//#endif
-		//		}
 		//5
 		if (GLEW_VERSION_4_6)
 		{
@@ -266,11 +226,7 @@ class Hello
 			glMultiDrawElementsIndirectCountARB(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
 #endif
 		}
-		//glFinish();
-		//glFlush();
-		//glClear(GL_COLOR_BUFFER_BIT);
-		glfwSwapBuffers(window);
-	}
+		}
 
 	void resize()
 	{
@@ -287,11 +243,10 @@ class Hello
 			framebufferResized = false;
 
 			uboMVP.P = glm::perspective(glm::radians(45.f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 1.f, 10.f);
-			uboMVP.P[1][1] *= -1;
-			glBindBuffer(GL_ARRAY_BUFFER, uboMVPBuffer);
-			void *data = glMapBufferRange(GL_ARRAY_BUFFER, sizeof(glm::mat4) * 2, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
+			glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
+			void *data = glMapBufferRange(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
 			memcpy(data, &uboMVP.P, sizeof(glm::mat4));
-			glUnmapBuffer(GL_ARRAY_BUFFER);
+			glUnmapBuffer(GL_UNIFORM_BUFFER);
 		}
 	}
 
@@ -301,70 +256,112 @@ class Hello
 		app->framebufferResized = true;
 	}
 
-	void createTestProgram()
+	void createPipelines()
 	{
-		if (GLEW_VERSION_4_5 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
-		{
-			auto vertCode = readFile((std::string(vertFile) + ".spv").c_str());
-			auto fragCode = readFile((std::string(fragFile) + ".spv").c_str());
+		auto vertCode = readFile((std::string(vertFile) + ".spv").c_str());
+		auto fragCode = readFile((std::string(fragFile) + ".spv").c_str());
 
-			ShaderCreateInfo vertShaderCreateInfo{
-				SHADER_STAGE_VERTEX_BIT,
-				vertCode};
+		ShaderCreateInfo vertShaderCreateInfo{
+			SHADER_STAGE_VERTEX_BIT,
+			vertCode};
 
-			ShaderCreateInfo fragShaderCreateInfo{
-				SHADER_STAGE_FRAGMENT_BIT,
-				fragCode};
+		ShaderCreateInfo fragShaderCreateInfo{
+			SHADER_STAGE_FRAGMENT_BIT,
+			fragCode};
 
-			createShaderBinary(vertShaderCreateInfo, &vertShader);
-			glSpecializeShader(vertShader, "main", 0, nullptr, nullptr);
-			createShaderBinary(fragShaderCreateInfo, &fragShader);
-			glSpecializeShader(fragShader, "main", 0, nullptr, nullptr);
-		}
-		else
-		{
-			auto vertCode = readFile(vertFile);
-			auto fragCode = readFile(fragFile);
-			ShaderCreateInfo vertShaderCreateInfo{
-				SHADER_STAGE_VERTEX_BIT,
-				vertCode};
+		createShaderBinary(vertShaderCreateInfo, &vertShader);
+		createShaderBinary(fragShaderCreateInfo, &fragShader);
 
-			ShaderCreateInfo fragShaderCreateInfo{
-				SHADER_STAGE_FRAGMENT_BIT,
-				fragCode};
+		SpecializationInfo vertSpecializationInfo{};
+		SpecializationInfo fragSpecializationInfo{};
+		std::vector<PipelineShaderStageCreateInfo> shaderStageCreateInfos{
+			{SHADER_STAGE_VERTEX_BIT,
+			 vertShader,
+			 "main",
+			 vertSpecializationInfo},
+			{SHADER_STAGE_FRAGMENT_BIT,
+			 fragShader,
+			 "main",
+			 fragSpecializationInfo},
+		};
 
-			createShader(vertShaderCreateInfo, &vertShader);
-			createShader(fragShaderCreateInfo, &fragShader);
-		}
-		createProgram({{vertShader, fragShader}}, &programId);
+		std::vector<VertexBindingDescription> bindingDescriptions{
+			Vertex::getVertexBindingDescription(),
+			InstanceAttribute::getVertexBindingDescription()};
 
-		GLint a;
-		glGetProgramiv(programId, GL_ACTIVE_ATTRIBUTES, &a);
-		LOG("GL_ACTIVE_ATTRIBUTES");
-		LOG(a);
-		glGetProgramiv(programId, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &a);
-		LOG("GL_ACTIVE_ATTRIBUTE_MAX_LENGTH");
-		LOG(a);
-		glGetProgramiv(programId, GL_ACTIVE_UNIFORMS, &a);
-		LOG("GL_ACTIVE_UNIFORMS");
-		LOG(a);
-		GLint b;
-		glGetProgramiv(programId, GL_ACTIVE_UNIFORM_MAX_LENGTH, &b);
-		LOG(" GL_ACTIVE_UNIFORM_MAX_LENGTH ");
-		LOG(b);
-		std::string name;
-		name.resize(b);
-		GLsizei len;
-		GLint size;
-		GLenum type;
-		for (int i = 0; i < a; ++i)
-		{
-			glGetActiveUniform(programId, i, b, &len, &size, &type, name.data());
-			LOG_VAR(name);
-			LOG_VAR(len);
-			LOG_VAR(size);
-			LOG_VAR(type);
-		}
+		std::vector<VertexAttributeDescription> attributeDescriptions = Vertex::getVertexAttributeDescription(0, 0);
+		auto attributeDescriptions0 = InstanceAttribute::getVertexAttributeDescription(Vertex::getLocationsNum(), 1);
+		attributeDescriptions.insert(attributeDescriptions.end(), attributeDescriptions0.begin(), attributeDescriptions0.end());
+
+		VertexInputStateCreateInfo vertexInputStateDescription{
+			std::move(bindingDescriptions),
+			std::move(attributeDescriptions)};
+
+		GraphicsPipelineCreateInfo pipelineCreateInfo{
+			std::move(shaderStageCreateInfos),
+			std::move(vertexInputStateDescription)};
+
+		createGraphicsPipeline(pipelineCreateInfo, &pipeline, &programs);
+
+		//create vao
+		//createVertexArray(pipelineCreateInfo.vertexInputState, {vertexBuffer}, indexBuffer, &vertexArray);
+		createVertexArray2(pipelineCreateInfo.vertexInputState, vertexArray);
+	}
+	void createDescriptorSets()
+	{
+		DescriptorSetLayoutCreateInfo setLayoutCreateInfo{{
+			{
+				1,
+				DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				1,
+			},
+			{
+				1,
+				DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				1,
+			},
+		}};
+		createDescriptorSetLayout(setLayoutCreateInfo, descriptorSetLayout);
+
+		createDescriptorSet({descriptorSetLayout}, descriptorSet);
+	}
+
+	void updateDescriptors()
+	{
+		SamplerCreateInfo samplerCreateInfo{
+			FILTER_NEAREST,
+			FILTER_NEAREST,
+			SAMPLER_MIPMAP_MODE_NEAREST,
+			SAMPLER_WRAP_MODE_REPEAT,
+			SAMPLER_WRAP_MODE_REPEAT,
+			SAMPLER_WRAP_MODE_REPEAT,
+			0,
+		};
+		std::vector<WriteDescriptorSet> descriptorWrites{
+			{
+				descriptorSet,
+				1,
+				0,
+				DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				{{samplerCreateInfo,
+				  testImageView0}},
+				IMAGE_VIEW_TYPE_2D,
+				false,
+			},
+			{
+				descriptorSet,
+				1,
+				0,
+				DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				{},
+				IMAGE_VIEW_TYPE_2D,
+				0,
+				{{uboMVPBuffer,
+				  0,
+				  static_cast<uint32_t>(sizeof(UBO_MVP))}},
+			},
+		};
+		updateDescriptorSets(descriptorWrites, {});
 	}
 
 	void createVertexBuffer()
@@ -375,20 +372,6 @@ class Hello
 	void createIndexBuffer()
 	{
 		createBuffer({0, indices.size() * sizeof(indices[0]), 0}, indices.data(), &indexBuffer);
-	}
-	void createVAO()
-	{
-		std::vector<VertexBindingDescription> bindingDescriptions{
-			Vertex::getVertexBindingDescription()};
-
-		auto attributeDescriptions0 = Vertex::getVertexAttributeDescription(0, 0);
-		std::vector<VertexAttributeDescription> attributeDescriptions;
-		attributeDescriptions.insert(attributeDescriptions.end(), attributeDescriptions0.begin(), attributeDescriptions0.end());
-
-		VertexInputStateCreateInfo vertexInputStateDescription{
-			std::move(bindingDescriptions),
-			std::move(attributeDescriptions)};
-		createVertexArray(vertexInputStateDescription, {vertexBuffer}, indexBuffer, &vertexArray);
 	}
 
 	void createDrawCommandBuffer()
@@ -404,23 +387,26 @@ class Hello
 
 	void createUboBuffer()
 	{
+		createBuffer({0, sizeof(UBO_MVP), BUFFER_STORAGE_MAP_WRITE_BIT}, nullptr, &uboMVPBuffer);
+
 		uboMVP = {
-			glm::rotate(glm::mat4(1), glm::radians(10.f), glm::vec3(0, 0, 1)),
-			glm::lookAt(glm::vec3(0, 0, 1.5), glm::vec3(0), glm::vec3(0, 1, 0)),
+			glm::rotate(glm::mat4(1), glm::radians(20.f), glm::vec3(0, 0, 1)),
+			glm::lookAt(glm::vec3(0, 0, 2), glm::vec3(0), glm::vec3(0, 1, 0)),
 			glm::perspective(glm::radians(45.f), static_cast<float>(WIDTH) / static_cast<float>(HEIGHT), 1.f, 10.f)};
-		uboMVP.P[1][1] *= -1;
-		createBuffer({0, sizeof(UBO_MVP), BUFFER_STORAGE_MAP_WRITE_BIT}, &uboMVP, &uboMVPBuffer);
-		//createBuffer({BUFFER_CREATE_MUTABLE_FORMAT_BIT, sizeof(UBO_MVP),  BUFFER_MUTABLE_STORAGE_STREAM_DRAW}, &uboMVP,&uboMVPBuffer);
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
+		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(UBO_MVP), GL_MAP_WRITE_BIT);
+		memcpy(data, &uboMVP, sizeof(UBO_MVP));
+		glUnmapBuffer(GL_UNIFORM_BUFFER);
 	}
 	void updateUboBuffers()
 	{
-		//float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
-		//uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
+		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
 
-		//glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMVPBuffer, 0, sizeof(glm::mat4));
-		//void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
-		//memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
-		//glUnmapBuffer(GL_UNIFORM_BUFFER);
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
+		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
+		memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
+		glUnmapBuffer(GL_UNIFORM_BUFFER);
 	}
 	void createTextureImage()
 	{
@@ -458,44 +444,24 @@ class Hello
 			glBindTexture(target, 0);
 		}
 
-		glFinish();
-
 		ImageViewCreateInfo imageViewCreateInfo{
 			testImage,
 			IMAGE_VIEW_TYPE_2D,
 			GL_SRGB8_ALPHA8,
-			//GL_RGBA8,
-			{
-				//				COMPONENT_SWIZZLE_B,
-				//				COMPONENT_SWIZZLE_G,
-				//				COMPONENT_SWIZZLE_R,
-				//				COMPONENT_SWIZZLE_A,
-			},
-			{IMAGE_ASPECT_COLOR_BIT, 0, 10, 0, 1},
+			{},
+			{IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
 		};
 		createImageView(imageViewCreateInfo, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, &testImageView0);
 		imageViewCreateInfo.format = GL_RGBA8;
 		imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
 		createImageView(imageViewCreateInfo, imageCreateInfo.samples > SAMPLE_COUNT_1_BIT, &testImageView1);
 
-		//bind image and sampler
-		SamplerCreateInfo samplerCreateInfo{
-			.magFilter= FILTER_NEAREST,
-			.minFilter= FILTER_NEAREST,
-			.mipmapMode= SAMPLER_MIPMAP_MODE_NEAREST,
-			.wrapModeU= SAMPLER_WRAP_MODE_REPEAT,
-			.wrapModeV=SAMPLER_WRAP_MODE_REPEAT,
-			.wrapModeW=SAMPLER_WRAP_MODE_REPEAT,
-			.minLod=0,
-			.maxLod=100,
-		};
-		if (imageCreateInfo.samples <= SAMPLE_COUNT_1_BIT)
-		{
-			setImageSampler(samplerCreateInfo, testImageView0, imageViewCreateInfo.viewType);
-			setImageSampler(samplerCreateInfo, testImageView1, imageViewCreateInfo.viewType);
-		}
-
 		stbi_image_free(pixels);
+	}
+
+	void createInstanceBuffer()
+	{
+		createBuffer({0, instanceAttributes.size() * sizeof(instanceAttributes[0]), 0}, instanceAttributes.data(), &instanceBuffer);
 	}
 
 public:

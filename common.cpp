@@ -19,8 +19,7 @@ void EnableDebugOutput(const void *userParam)
 		glEnable(GL_DEBUG_OUTPUT);
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); // makes sure errors are displayed
 											   // synchronously
-
-		if (GLVersion.major * 10 + GLVersion.minor >= 43)
+		if (GLEW_VERSION_4_3)
 		{
 			glDebugMessageCallback(DebugOutputCallback, userParam);
 			glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0,
@@ -135,33 +134,127 @@ void APIENTRY DebugOutputCallback(GLenum source, GLenum type, GLuint id,
 
 void listGLInfo()
 {
-#ifdef GL_EXT_memory_object
-	int NUM_DEVICE_UUIDS_EXT;
-	glGetIntegerv(GL_NUM_DEVICE_UUIDS_EXT, &NUM_DEVICE_UUIDS_EXT);
-	LOG_VAR(NUM_DEVICE_UUIDS_EXT);
-	int DEVICE_UUID_EXT;
-	for (int i = 0; i < NUM_DEVICE_UUIDS_EXT; ++i)
+	if (glewIsSupported("GL_EXT_memory_object"))
 	{
-		LOG(i);
-		glGetIntegeri_v(GL_DEVICE_UUID_EXT, i, &DEVICE_UUID_EXT);
-		LOG_VAR(DEVICE_UUID_EXT);
+		int NUM_DEVICE_UUIDS_EXT;
+		glGetIntegerv(GL_NUM_DEVICE_UUIDS_EXT, &NUM_DEVICE_UUIDS_EXT);
+		LOG_VAR(NUM_DEVICE_UUIDS_EXT);
+		GLint64 DEVICE_UUID_EXT{};
+		for (int i = 0; i < NUM_DEVICE_UUIDS_EXT; ++i)
+		{
+			LOG(i);
+			glGetInteger64i_v(GL_DEVICE_UUID_EXT, i, &DEVICE_UUID_EXT);
+			LOG_VAR(DEVICE_UUID_EXT);
+		}
+		GLint64 DRIVER_UUID_EXT;
+		glGetInteger64v(GL_DRIVER_UUID_EXT, &DRIVER_UUID_EXT);
+		LOG_VAR(DRIVER_UUID_EXT);
 	}
-	int DRIVER_UUID_EXT;
-	glGetIntegerv(GL_DRIVER_UUID_EXT, &DRIVER_UUID_EXT);
-	LOG_VAR(DRIVER_UUID_EXT);
-#endif
-
-	LOG_VAR(GLVersion.major);
-	LOG_VAR(GLVersion.minor);
 
 	// check opengl informations
 	LOG_VAR(glGetString(GL_VENDOR));
 	LOG_VAR(glGetString(GL_RENDERER));
 	LOG_VAR(glGetString(GL_VERSION));
 	LOG_VAR(glGetString(GL_SHADING_LANGUAGE_VERSION));
+
+	int numShadingLanguageVersions{};
+	glGetIntegerv(GL_NUM_SHADING_LANGUAGE_VERSIONS, &numShadingLanguageVersions);
+	LOG_VAR(numShadingLanguageVersions);
+	for (int i = 0; i < numShadingLanguageVersions; ++i)
+		LOG_VAR(glGetStringi(GL_SHADING_LANGUAGE_VERSION, i));
+
 	int samples;
 	glGetIntegerv(GL_SAMPLES, &samples);
 	LOG_VAR(samples);
+
+	int maxFramebufferWidth{}, maxFramebufferHeight{};
+	glGetIntegerv(GL_MAX_FRAMEBUFFER_WIDTH, &maxFramebufferWidth);
+	glGetIntegerv(GL_MAX_FRAMEBUFFER_HEIGHT, &maxFramebufferHeight);
+	LOG_VAR(maxFramebufferWidth);
+	LOG_VAR(maxFramebufferHeight);
+
+	if (GLEW_VERSION_4_3)
+	{
+		//framebuffer parameter
+		GLenum list0[]{
+			//		GL_FRAMEBUFFER_DEFAULT_WIDTH,
+			//		GL_FRAMEBUFFER_DEFAULT_HEIGHT,
+			//		GL_FRAMEBUFFER_DEFAULT_LAYERS,
+			//		GL_FRAMEBUFFER_DEFAULT_SAMPLES,
+			//		GL_FRAMEBUFFER_DEFAULT_FIXED_SAMPLE_LOCATIONS,
+
+			GL_DOUBLEBUFFER,
+			GL_IMPLEMENTATION_COLOR_READ_FORMAT,
+			GL_IMPLEMENTATION_COLOR_READ_TYPE,
+			GL_SAMPLES,
+			GL_SAMPLE_BUFFERS,
+			GL_STEREO};
+		const char *list1[]{
+			"GL_DOUBLEBUFFER",
+			"GL_IMPLEMENTATION_COLOR_READ_FORMAT",
+			"GL_IMPLEMENTATION_COLOR_READ_TYPE",
+			"GL_SAMPLES",
+			"GL_SAMPLE_BUFFERS",
+			"GL_STEREO"};
+
+		//default framebuffer
+		for (int i = 0, len = sizeof list0 / sizeof list0[0]; i < len; ++i)
+		{
+			GLint a{};
+			glGetFramebufferParameteriv(GL_FRAMEBUFFER, list0[i], &a);
+			LOG(list1[i]);
+			LOG(a);
+		}
+	}
+
+	GLenum list2[]{
+		GL_FRONT_LEFT,
+		GL_FRONT_RIGHT,
+		GL_BACK_LEFT,
+		GL_BACK_RIGHT,
+		GL_DEPTH,
+		GL_STENCIL};
+	const char *list3[]{
+		"GL_FRONT_LEFT",
+		"GL_FRONT_RIGHT",
+		"GL_BACK_LEFT",
+		"GL_BACK_RIGHT",
+		"GL_DEPTH",
+		"GL_STENCIL"};
+	GLenum list4[]{
+		GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE,
+		GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE,
+		GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE,
+		GL_FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE,
+		GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE,
+		GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE,
+		GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE,
+		GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING};
+	const char *list5[]{
+		"GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE",
+		"GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE",
+		"GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE",
+		"GL_FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE",
+		"GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE",
+		"GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE",
+		"GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE",
+		"GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING"};
+	for (int i = 0; i < 6; ++i)
+	{
+		GLint a{};
+		glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, list2[i], GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &a);
+		LOG(list3[i]);
+		LOG(a);
+		if (a != GL_NONE)
+		{
+			for (int j = 0, len = sizeof list4 / sizeof list4[0]; j < len; ++j)
+			{
+				glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, list2[i], list4[j], &a);
+				LOG(list5[j]);
+				LOG(a);
+			}
+		}
+	}
 
 	// extensions
 #if 0
@@ -197,7 +290,7 @@ void listGLInfo()
 		GL_STENCIL_TEST,
 		GL_TEXTURE_CUBE_MAP_SEAMLESS,
 	};
-	constexpr char *glCapabilityEnumNames[]{
+	const char *glCapabilityEnumNames[]{
 		"GL_BLEND",
 		"GL_COLOR_LOGIC_OP",
 		"GL_CULL_FACE",
@@ -230,6 +323,90 @@ void listGLInfo()
 		LOG(glCapabilityEnumNames[i]);
 		LOG(bool(glIsEnabled(glCapabilityEnum[i])));
 	}
+	
+	int a;
+	glGetInternalformativ(GL_TEXTURE_2D_ARRAY, GL_BGR, GL_INTERNALFORMAT_SUPPORTED, 1, &a);
+	LOG("GL_BGR supported:");
+	LOG(a);
+	glGetInternalformativ(GL_TEXTURE_2D_ARRAY, GL_BGR, GL_INTERNALFORMAT_PREFERRED, 1, &a);
+	LOG("GL_BGR prefered:");
+	LOG(bool(a == GL_BGR));
+
+	constexpr GLenum aggregateLimits[]{
+		GL_MIN_PROGRAM_TEXEL_OFFSET,
+		GL_MAX_PROGRAM_TEXEL_OFFSET,
+		GL_MAX_UNIFORM_BUFFER_BINDINGS,
+		GL_MAX_UNIFORM_BLOCK_SIZE,
+		GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT,
+		GL_MAX_COMBINED_UNIFORM_BLOCKS,
+		GL_MAX_VARYING_COMPONENTS,
+		GL_MAX_VARYING_VECTORS,
+		GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
+		GL_MAX_SUBROUTINES,
+		GL_MAX_SUBROUTINE_UNIFORM_LOCATIONS,
+		GL_MAX_UNIFORM_LOCATIONS,
+		GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS,
+		GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE,
+		GL_MAX_COMBINED_ATOMIC_COUNTER_BUFFERS,
+		GL_MAX_COMBINED_ATOMIC_COUNTERS,
+		GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS,
+		GL_MAX_SHADER_STORAGE_BLOCK_SIZE,
+		GL_MAX_COMBINED_SHADER_STORAGE_BLOCKS,
+		GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT,
+		GL_MAX_IMAGE_UNITS,
+		GL_MAX_COMBINED_SHADER_OUTPUT_RESOURCES,
+		GL_MAX_IMAGE_SAMPLES,
+		GL_MAX_VERTEX_IMAGE_UNIFORMS,
+		GL_MAX_TESS_CONTROL_IMAGE_UNIFORMS,
+		GL_MAX_TESS_EVALUATION_IMAGE_UNIFORMS,
+		GL_MAX_GEOMETRY_IMAGE_UNIFORMS,
+		GL_MAX_FRAGMENT_IMAGE_UNIFORMS,
+		GL_MAX_COMBINED_IMAGE_UNIFORMS,
+		GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS,
+		GL_MAX_COMBINED_GEOMETRY_UNIFORM_COMPONENTS,
+		GL_MAX_COMBINED_TESS_CONTROL_UNIFORM_COMPONENTS,
+		GL_MAX_COMBINED_TESS_EVALUATION_UNIFORM_COMPONENTS,
+		GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS,
+	};
+	std::string aggregateLimitNames[]{
+		"GL_MIN_PROGRAM_TEXEL_OFFSET",
+		"GL_MAX_PROGRAM_TEXEL_OFFSET",
+		"GL_MAX_UNIFORM_BUFFER_BINDINGS",
+		"GL_MAX_UNIFORM_BLOCK_SIZE",
+		"GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT",
+		"GL_MAX_COMBINED_UNIFORM_BLOCKS",
+		"GL_MAX_VARYING_COMPONENTS",
+		"GL_MAX_VARYING_VECTORS",
+		"GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS",
+		"GL_MAX_SUBROUTINES",
+		"GL_MAX_SUBROUTINE_UNIFORM_LOCATIONS",
+		"GL_MAX_UNIFORM_LOCATIONS",
+		"GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS",
+		"GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE",
+		"GL_MAX_COMBINED_ATOMIC_COUNTER_BUFFERS",
+		"GL_MAX_COMBINED_ATOMIC_COUNTERS",
+		"GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS",
+		"GL_MAX_SHADER_STORAGE_BLOCK_SIZE",
+		"GL_MAX_COMBINED_SHADER_STORAGE_BLOCKS",
+		"GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT",
+		"GL_MAX_IMAGE_UNITS",
+		"GL_MAX_COMBINED_SHADER_OUTPUT_RESOURCES",
+		"GL_MAX_IMAGE_SAMPLES",
+		"GL_MAX_VERTEX_IMAGE_UNIFORMS",
+		"GL_MAX_TESS_CONTROL_IMAGE_UNIFORMS",
+		"GL_MAX_TESS_EVALUATION_IMAGE_UNIFORMS",
+		"GL_MAX_GEOMETRY_IMAGE_UNIFORMS",
+		"GL_MAX_FRAGMENT_IMAGE_UNIFORMS",
+		"GL_MAX_COMBINED_IMAGE_UNIFORMS",
+		"GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS",
+		"GL_MAX_COMBINED_GEOMETRY_UNIFORM_COMPONENTS",
+		"GL_MAX_COMBINED_TESS_CONTROL_UNIFORM_COMPONENTS",
+		"GL_MAX_COMBINED_TESS_EVALUATION_UNIFORM_COMPONENTS",
+		"GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS",
+	};		
+
+
+
 }
 
 std::string readFile(const char *filename)
@@ -400,17 +577,13 @@ void createProgram(const ProgramCreateInfo &createInfo, ProgramHandle *pProgram)
 
 void createGraphicsPipeline(const GraphicsPipelineCreateInfo &createInfo, PipelineHandle *pPipeline, std::vector<ProgramHandle> *pPrograms)
 {
-	if (GLVersion.major * 10 + GLVersion.minor > 41)
+	if (GLEW_VERSION_4_1)
 	{
 		glGenProgramPipelines(1, pPipeline);
 	}
 	else
 	{
-#ifdef GL_EXT_separate_shader_objects
-		glGenProgramPipelinesEXT(1, pPipeline);
-#else
 		throw std::runtime_error("failed to create pipelines");
-#endif
 	}
 	glBindProgramPipeline(*pPipeline);
 	for (auto &stageCreateInfo : createInfo.stages)
@@ -465,11 +638,6 @@ void createVertexArray(const VertexInputStateCreateInfo &vertexInputStateCreateI
 					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray)
 {
-	std::vector<std::pair<int, int>> bindingDescriptions(vertexInputStateCreateInfo.vertexAttributeDescriptions.size());
-
-	for (auto &e : vertexInputStateCreateInfo.vertexBindingDescriptions)
-		bindingDescriptions[e.binding] = {e.stride, e.divisor};
-
 	glGenVertexArrays(1, pVertexArray);
 	if (*pVertexArray == 0)
 		throw std::runtime_error("failed to create vertex array object");
@@ -482,116 +650,144 @@ void createVertexArray(const VertexInputStateCreateInfo &vertexInputStateCreateI
 		glVertexAttribPointer(
 			attrib.location, attrib.components,
 			Map(attrib.dataType), attrib.normalized,
-			bindingDescriptions[attrib.binding].first,
+			vertexInputStateCreateInfo.vertexBindingDescriptions[attrib.binding].stride,
 			(void *)attrib.offset);
-		glVertexAttribDivisor(attrib.location, bindingDescriptions[attrib.binding].second);
+		glVertexAttribDivisor(attrib.location, vertexInputStateCreateInfo.vertexBindingDescriptions[attrib.binding].divisor);
 	}
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
 	glBindVertexArray(0);
 }
+void createVertexArray2(const VertexInputStateCreateInfo &vertexInputStateCreateInfo, VertexArrayHandle &vao)
+{
+	glGenVertexArrays(1, &vao);
+	if (vao == 0)
+		THROW("failed to create vertex array object");
+	glBindVertexArray(vao);
+	for (auto &&attrib : vertexInputStateCreateInfo.vertexAttributeDescriptions)
+	{
+		glVertexAttribFormat(
+			attrib.location,
+			attrib.components,
+			Map(attrib.dataType),
+			attrib.normalized,
+			attrib.offset);
+		glVertexAttribBinding(attrib.location, attrib.binding);
+		//glVertexBindingDivisor(attrib.location, vertexInputStateCreateInfo.vertexBindingDescriptions[attrib.binding].divisor);
+		glVertexBindingDivisor(attrib.binding, vertexInputStateCreateInfo.vertexBindingDescriptions[attrib.binding].divisor);
+		glEnableVertexAttribArray(attrib.location);
+	}
+}
 
 void createImage(const ImageCreateInfo &createInfo, ImageHandle *pImage)
 {
-	glGenTextures(1, pImage);
-	GLenum target = Map(createInfo.imageType, createInfo.samples > SAMPLE_COUNT_1_BIT);
-	glBindTexture(target, *pImage);
-	if (createInfo.flags & IMAGE_CREAT_MUTABLE_FORMAT_BIT)
+	if (createInfo.flags & IMAGE_CREATE_RENDER_BUFFER_BIT)
 	{
+		glGenRenderbuffers(1, pImage);
+		glBindRenderbuffer(GL_RENDERBUFFER, *pImage);
 		if (createInfo.samples > SAMPLE_COUNT_1_BIT)
 		{
-			glTexImage3DMultisample(GL_TEXTURE_2D_MULTISAMPLE_ARRAY,
-									createInfo.samples,
-									createInfo.format,
-									createInfo.extent.width,
-									createInfo.extent.height,
-									createInfo.extent.depth,
-									GL_FALSE);
+			glRenderbufferStorageMultisample(
+				GL_RENDERBUFFER,
+				createInfo.samples,
+				createInfo.format,
+				createInfo.extent.width,
+				createInfo.extent.height);
 		}
 		else
 		{
-			switch (createInfo.imageType)
-			{
-			case IMAGE_TYPE_1D:
-				glTexImage2D(GL_TEXTURE_1D_ARRAY,
-							 0,
-							 createInfo.format,
-							 createInfo.extent.width,
-							 createInfo.extent.height,
-							 0,
-							 GL_RGBA,
-							 GL_UNSIGNED_BYTE,
-							 nullptr);
-				break;
-			case IMAGE_TYPE_2D:
-				glTexImage3D(GL_TEXTURE_2D_ARRAY,
-							 0,
-							 createInfo.format,
-							 createInfo.extent.width,
-							 createInfo.extent.height,
-							 createInfo.extent.depth,
-							 0,
-							 GL_RGBA,
-							 GL_UNSIGNED_BYTE,
-							 nullptr);
-				break;
-			case IMAGE_TYPE_3D:
-				glTexImage3D(GL_TEXTURE_3D,
-							 0,
-							 createInfo.format,
-							 createInfo.extent.width,
-							 createInfo.extent.height,
-							 createInfo.extent.depth,
-							 0,
-							 GL_RGBA,
-							 GL_UNSIGNED_BYTE,
-							 nullptr);
-				break;
-			}
+			glRenderbufferStorage(
+				GL_RENDERBUFFER,
+				createInfo.format,
+				createInfo.extent.width,
+				createInfo.extent.height);
 		}
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	}
 	else
 	{
-		if (createInfo.samples > SAMPLE_COUNT_1_BIT)
+		glGenTextures(1, pImage);
+		GLenum target = Map(createInfo.imageType, createInfo.samples > SAMPLE_COUNT_1_BIT);
+		glBindTexture(target, *pImage);
+		if (createInfo.flags & IMAGE_CREATE_MUTABLE_FORMAT_BIT)
 		{
-			glTexStorage3DMultisample(target,
-									  createInfo.samples,
-									  createInfo.format,
-									  createInfo.extent.width,
-									  createInfo.extent.height,
-									  createInfo.extent.depth,
-									  GL_FALSE);
+			if (createInfo.samples > SAMPLE_COUNT_1_BIT)
+			{
+				glTexImage3DMultisample(target,
+										createInfo.samples,
+										createInfo.format,
+										createInfo.extent.width,
+										createInfo.extent.height,
+										createInfo.extent.depth,
+										GL_FALSE);
+			}
+			else
+			{
+				switch (createInfo.imageType)
+				{
+				case IMAGE_TYPE_1D:
+					glTexImage2D(target,
+								 0,
+								 createInfo.format,
+								 createInfo.extent.width,
+								 createInfo.extent.height,
+								 0,
+								 GL_BGRA,
+								 GL_UNSIGNED_BYTE,
+								 nullptr);
+					break;
+				case IMAGE_TYPE_2D:
+				case IMAGE_TYPE_3D:
+					glTexImage3D(target,
+								 0,
+								 createInfo.format,
+								 createInfo.extent.width,
+								 createInfo.extent.height,
+								 createInfo.extent.depth,
+								 0,
+								 GL_BGRA,
+								 GL_UNSIGNED_BYTE,
+								 nullptr);
+					break;
+				}
+			}
 		}
 		else
 		{
-			switch (createInfo.imageType)
+			if (createInfo.samples > SAMPLE_COUNT_1_BIT)
 			{
-			case IMAGE_TYPE_1D:
-				glTexStorage2D(target,
-							   createInfo.mipLevels,
-							   createInfo.format,
-							   createInfo.extent.width,
-							   createInfo.extent.height);
-				break;
-			case IMAGE_TYPE_2D:
-				glTexStorage3D(target,
-							   createInfo.mipLevels,
-							   createInfo.format,
-							   createInfo.extent.width,
-							   createInfo.extent.height,
-							   createInfo.extent.depth);
-				break;
-			case IMAGE_TYPE_3D:
-				glTexStorage3D(target,
-							   createInfo.mipLevels,
-							   createInfo.format,
-							   createInfo.extent.width,
-							   createInfo.extent.height,
-							   createInfo.extent.depth);
-				break;
+				glTexStorage3DMultisample(target,
+										  createInfo.samples,
+										  createInfo.format,
+										  createInfo.extent.width,
+										  createInfo.extent.height,
+										  createInfo.extent.depth,
+										  GL_FALSE);
+			}
+			else
+			{
+				switch (createInfo.imageType)
+				{
+				case IMAGE_TYPE_1D:
+					glTexStorage2D(target,
+								   createInfo.mipLevels,
+								   createInfo.format,
+								   createInfo.extent.width,
+								   createInfo.extent.height);
+					break;
+				case IMAGE_TYPE_2D:
+				case IMAGE_TYPE_3D:
+					glTexStorage3D(target,
+								   createInfo.mipLevels,
+								   createInfo.format,
+								   createInfo.extent.width,
+								   createInfo.extent.height,
+								   createInfo.extent.depth);
+					break;
+				}
 			}
 		}
+		glBindTexture(target, 0);
 	}
-	glBindTexture(target, 0);
 }
 
 void createSampler(const SamplerCreateInfo &createInfo, SamplerHandle *pSampler)
@@ -631,18 +827,18 @@ void createSampler(const SamplerCreateInfo &createInfo, SamplerHandle *pSampler)
 		glSamplerParameterfv(*pSampler, GL_TEXTURE_BORDER_COLOR, createInfo.borderColor.color.float32);
 }
 
-//void createMemory(MemoryHandle *pMemory)
-//{
-//	/*
-//		server memory, cannot be accessed directly
-//	*/
-//	glCreateMemoryObjectsEXT(1, pMemory);
-//
-//	int dedicatedMemory{}; //external memory
-//	glMemoryObjectParameterivEXT(*pMemory, GL_DEDICATED_MEMORY_OBJECT_EXT, &dedicatedMemory);
-//	int protectedMemory{}; //
-//	glMemoryObjectParameterivEXT(*pMemory, GL_PROTECTED_MEMORY_OBJECT_EXT, &protectedMemory);
-//}
+void createMemory(MemoryHandle &memory)
+{
+	/*
+		server memory, cannot be accessed directly
+	*/
+	glCreateMemoryObjectsEXT(1, &memory);
+
+	int dedicatedMemory{}; //external memory
+	glMemoryObjectParameterivEXT(memory, GL_DEDICATED_MEMORY_OBJECT_EXT, &dedicatedMemory);
+	int protectedMemory{}; //
+	glMemoryObjectParameterivEXT(memory, GL_PROTECTED_MEMORY_OBJECT_EXT, &protectedMemory);
+}
 SemaphoreHandle createSemaphore()
 {
 	SemaphoreHandle semaphore;
@@ -650,7 +846,7 @@ SemaphoreHandle createSemaphore()
 	return semaphore;
 }
 
-GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings, ImageType imageType, bool multisample, GLenum format)
+ImageTiling findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings, ImageType imageType, bool multisample, GLenum format)
 {
 	GLenum target = Map(imageType, multisample);
 
@@ -668,30 +864,64 @@ GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings,
 			{
 				LOG("support tiling type is:");
 				LOG(tiling);
-				return tiling;
+				return canditiling;
 			}
 		}
 	}
 	throw std::runtime_error("failed to find supported tiling type");
 }
 
-void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, ImageHandle *pImageViewHandle)
+void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, ImageViewHandle *pImageViewHandle)
 {
 	GLenum target = Map(createInfo.viewType, multisample);
 	glGenTextures(1, pImageViewHandle);
-	glTextureView(*pImageViewHandle,
-				  target,
-				  createInfo.image,
-				  createInfo.format,
-				  createInfo.subresourceRange.baseMipLevel,
-				  createInfo.subresourceRange.levelCount,
-				  createInfo.subresourceRange.baseArrayLayer,
-				  createInfo.subresourceRange.layerCount);
+	if (GLEW_VERSION_4_3)
+	{
+		glTextureView(*pImageViewHandle,
+					  target,
+					  createInfo.image,
+					  createInfo.format,
+					  createInfo.subresourceRange.baseMipLevel,
+					  createInfo.subresourceRange.levelCount,
+					  createInfo.subresourceRange.baseArrayLayer,
+					  createInfo.subresourceRange.layerCount);
+	}
+	else if (glewIsSupported("GL_EXT_texture_view"))
+	{
+		glTextureViewEXT(*pImageViewHandle,
+					  target,
+					  createInfo.image,
+					  createInfo.format,
+					  createInfo.subresourceRange.baseMipLevel,
+					  createInfo.subresourceRange.levelCount,
+					  createInfo.subresourceRange.baseArrayLayer,
+					  createInfo.subresourceRange.layerCount);
+	}
+	else
+	{
+		THROW("texture view not supported");
+	}
 	glBindTexture(target, *pImageViewHandle);
 	if (createInfo.subresourceRange.aspectMask & IMAGE_ASPECT_DEPTH_BIT)
-		glTextureParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+		glTexParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 	else if (createInfo.subresourceRange.aspectMask & IMAGE_ASPECT_STENCIL_BIT)
-		glTextureParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_COMPONENTS);
+		glTexParameteri(target, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_COMPONENTS);
+
+	GLint swizzles[4]{
+		GL_RED,
+		GL_GREEN,
+		GL_BLUE,
+		GL_ALPHA,
+	};
+	if (createInfo.components.r != COMPONENT_SWIZZLE_IDENTITY)
+		swizzles[0] = Map(createInfo.components.r);
+	if (createInfo.components.g != COMPONENT_SWIZZLE_IDENTITY)
+		swizzles[1] = Map(createInfo.components.g);
+	if (createInfo.components.b != COMPONENT_SWIZZLE_IDENTITY)
+		swizzles[2] = Map(createInfo.components.b);
+	if (createInfo.components.a != COMPONENT_SWIZZLE_IDENTITY)
+		swizzles[3] = Map(createInfo.components.a);
+	glTexParameteriv(target, GL_TEXTURE_SWIZZLE_RGBA, swizzles);
 	glBindTexture(target, 0);
 }
 
@@ -731,8 +961,15 @@ void updateImageSubData(ImageHandle image, ImageType imageType, const ImageSubDa
 	}
 	glBindTexture(target, 0);
 };
+void updateImageSubData2(ImageHandle image, ImageType imageType, const ImageSubData &imageSubData)
+{
+	GLenum target = Map(imageType, false);
+	glBindTexture(target, image);
 
-void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType, bool multisample)
+	glBindTexture(target, 0);
+};
+
+void setImageSampler(const SamplerCreateInfo &createInfo, ImageViewHandle image, ImageViewType imageViewType, bool multisample)
 {
 	if (multisample == true)
 	{
@@ -842,4 +1079,14 @@ void updateDescriptorSets(const std::vector<WriteDescriptorSet> &descriptorWrite
 	//for (auto &copySet : descriptorCopy)
 	//{
 	//}
+}
+
+void createFramebufferamer(const FramebufferCreateInfo &createInfo, FramebufferHandle &framebuffer)
+{
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	const auto &attachmentDesc = *createInfo.renderpass->GetCreateInfoPtr()->spAttachments;
+	for (int i = 0, len = attachmentDesc.size(); i < len; ++i)
+	{
+	}
 }

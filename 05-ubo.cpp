@@ -13,8 +13,8 @@ constexpr GLuint WIDTH = 800, HEIGHT = 600;
 
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
-constexpr char *vertFile = SHADER_PATH "05.vert";
-constexpr char *fragFile = SHADER_PATH "05.frag";
+const char *vertFile = SHADER_PATH "05.vert";
+const char *fragFile = SHADER_PATH "05.frag";
 
 //std140, round to base alignment of vec4
 struct UBO_MVP
@@ -42,6 +42,9 @@ std::vector<Vertex> vertices{
 std::vector<uint32_t> indices{
 	0, 1, 2, 2, 1, 3};
 
+std::vector<uint32_t> indices2{
+	0, 1, 2, 2, 0, 3};
+
 std::vector<DrawIndirectCommand> drawIndirectCmds{{4, 1, 0, 0}};
 std::vector<DrawIndexedIndirectCommand> drawIndexedIndirectCmds{{6, 1, 0, 0, 0}};
 
@@ -62,6 +65,7 @@ class Hello
 	VertexArrayHandle vertexArray;
 	BufferHandle vertexBuffer;
 	BufferHandle indexBuffer;
+	BufferHandle indexBuffer2;
 	BufferHandle drawIndirectCmdBuffer;
 	BufferHandle drawIndirectCmdCountBuffer;
 	BufferHandle drawIndexedIndirectCmdBuffer;
@@ -95,14 +99,20 @@ class Hello
 	}
 	void initOpengl()
 	{
-		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
-			throw std::runtime_error("failed to load glad");
+		GLenum err = glewInit();
+		if (GLEW_OK != err)
+		{
+			/* Problem: glewInit failed, something is seriously wrong. */
+			fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+			THROW("failed to init glew");
+		}
 
 		listGLInfo();
 
 #ifndef NODEBUG
 		EnableDebugOutput(this);
 #endif
+		glEnable(GL_MULTISAMPLE);
 
 		glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 
@@ -150,6 +160,7 @@ class Hello
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUseProgram(programId);
 		glBindVertexArray(vertexArray);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer2);
 		updateUboBuffers();
 		glBindBufferRange(GL_UNIFORM_BUFFER, 1, uboMVPBuffer, 0, sizeof(UBO_MVP));
 		//1
@@ -207,7 +218,7 @@ class Hello
 		//#endif
 		//		}
 		//5
-		if (GLVersion.major * 10 + GLVersion.minor >= 46)
+		if (GLEW_VERSION_4_6)
 		{
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
 			glBindBuffer(GL_PARAMETER_BUFFER, drawIndexedIndirectCmdCountBuffer);
@@ -247,7 +258,7 @@ class Hello
 
 	void createTestProgram()
 	{
-		if (GLVersion.major * 10 + GLVersion.minor > 45 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
+		if (GLEW_VERSION_4_5 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
 		{
 			auto vertCode = readFile((std::string(vertFile) + ".spv").c_str());
 			auto fragCode = readFile((std::string(fragFile) + ".spv").c_str());
@@ -291,11 +302,12 @@ class Hello
 	void createIndexBuffer()
 	{
 		createBuffer({0, indices.size() * sizeof(indices[0]), 0}, indices.data(), &indexBuffer);
+		createBuffer({0, indices2.size() * sizeof(indices2[0]), 0}, indices2.data(), &indexBuffer2);
 	}
 	void createVAO()
 	{
 		std::vector<VertexBindingDescription> bindingDescriptions{
-			Vertex::getVertexBindingDescription(0)};
+			Vertex::getVertexBindingDescription()};
 
 		auto attributeDescriptions0 = Vertex::getVertexAttributeDescription(0, 0);
 		std::vector<VertexAttributeDescription> attributeDescriptions;
@@ -326,7 +338,7 @@ class Hello
 	void updateUboBuffers()
 	{
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
-		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(30.f), glm::vec3(0, 0, 1));
+		uboMVP.M = glm::rotate(glm::mat4(1), time * glm::radians(5.f), glm::vec3(0, 0, 1));
 
 		glBindBuffer(GL_UNIFORM_BUFFER, uboMVPBuffer);
 		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);

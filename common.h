@@ -17,7 +17,7 @@
 #include <chrono>
 #include <thread>
 
-#include <glad/glad.h>
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
@@ -37,17 +37,22 @@
 	std::cout << __FILE__ << " " << __LINE__ << ":  " << #str << ": " << str << std::endl
 #endif
 
-typedef uint32_t Format;
-typedef uint32_t ShaderHandle;
-typedef uint32_t ProgramHandle;
-typedef uint32_t PipelineHandle;
-typedef uint32_t BufferHandle;
-typedef uint32_t VertexArrayHandle;
-typedef uint32_t SamplerHandle;
-typedef uint32_t ImageHandle;
-typedef uint32_t BufferViewHandle;
-typedef uint32_t MemoryHandle;	  //need GL_EXT_memory_object
-typedef uint32_t SemaphoreHandle; //need GL_EXT_semaphore
+#define THROW(str) throw std::runtime_error(__FILE__ " " + std::to_string(__LINE__) + ": " + str);
+
+using Format = uint32_t;
+using ShaderHandle = uint32_t;
+using ProgramHandle = uint32_t;
+using PipelineHandle = uint32_t;
+using BufferHandle = uint32_t;
+using VertexArrayHandle = uint32_t;
+using SamplerHandle = uint32_t;
+using ImageHandle = uint32_t;
+using ImageViewHandle = uint32_t;
+using BufferViewHandle = uint32_t;
+using MemoryHandle = uint32_t;	  //need GL_EXT_memory_object
+using SemaphoreHandle = uint32_t; //need GL_EXT_semaphore
+using FramebufferHandle = uint32_t;
+using RenderbufferHandle = uint32_t;
 
 struct Offset2D
 {
@@ -87,17 +92,89 @@ struct Rect3D
 	Extent3D extent;
 };
 
-union ClearColor
+union ClearColorValue
 {
 	float float32[4];
 	int32_t int32[4];
 	uint32_t uint32[4];
 };
 
+struct ClearDepthStencilValue
+{
+	float depth;
+	uint32_t stencil;
+};
+
+struct ClearValue
+{
+	ClearColorValue color;
+	ClearDepthStencilValue depthStencil;
+};
+
 struct BorderColor
 {
 	DataType dataType;
-	ClearColor color;
+	ClearColorValue color;
+};
+
+struct AttachmentDescription
+{
+	SampleCountFlagBits samples;
+	AttachmentLoadOp loadOp;   //glclear
+	AttachmentStoreOp storeOp; //opengl default store
+	AttachmentLoadOp stencilLoadOp;
+	AttachmentStoreOp stencilStoreOp;
+};
+
+struct AttachmentReference
+{
+	uint32_t attachment;
+	//ImageLayout layout; //TODO:
+};
+
+struct SubpassDescription
+{
+	PipelineBindPoint pipelineBindPoint;
+	std::shared_ptr<std::vector<AttachmentReference>> spColorAttachments;
+	std::shared_ptr<AttachmentReference> spResolveAttachment;
+	std::shared_ptr<AttachmentReference> spDepthStencilAttachment;
+};
+
+struct RenderPassCreateInfo
+{
+	std::shared_ptr<std::vector<AttachmentDescription>> spAttachments;
+	std::shared_ptr<std::vector<SubpassDescription>> spSubpasses;
+	//	std::shared_ptr<std::vector<SubpassDependencies>> spSubpassDependencies;	//TODO:spSubpassDependencies
+};
+
+class RenderPass
+{
+	std::unique_ptr<RenderPassCreateInfo> _createInfo;
+public:
+	RenderPass(const RenderPassCreateInfo &createInfo)
+		: _createInfo(std::make_unique<RenderPassCreateInfo>(createInfo)){
+
+		  };
+	RenderPassCreateInfo* GetCreateInfoPtr(){
+		return _createInfo.get();
+	}
+};
+
+struct FramebufferCreateInfo
+{
+	RenderPass *renderpass;
+	std::shared_ptr<std::vector<ImageHandle>> spAttachments; //image views
+	uint32_t width;
+	uint32_t height;
+	uint32_t layers;
+};
+
+struct RenderPassBeginInfo
+{
+	RenderPass *renderPass;
+	FramebufferHandle framebuffer;
+	Rect2D renderArea;
+	std::vector<ClearValue> clearValues;
 };
 
 struct SamplerCreateInfo
@@ -117,6 +194,12 @@ struct SamplerCreateInfo
 	BorderColor borderColor;
 };
 
+struct RenderBufferCreateInfo{
+	Format format;
+	Extent2D extent;
+	SampleCountFlagBits samples;
+};
+
 struct ImageCreateInfo
 {
 	ImageCreateFlags flags;
@@ -126,7 +209,7 @@ struct ImageCreateInfo
 	uint32_t mipLevels;
 	uint32_t arrayLayers;
 	SampleCountFlagBits samples;
-	ImageTiling tiling; //TODO:texture storage must be allocated using TexStorageMem*EXT
+//	ImageTiling tiling; 
 };
 
 struct ImageSubresourceLayer
@@ -371,7 +454,6 @@ struct VertexAttributeDescription
 
 struct VertexBindingDescription
 {
-	uint32_t binding; //index in given buffers
 	uint32_t stride;
 	uint32_t divisor; //attributes advance once per divior instances,when 0, advance per vertex
 };
@@ -394,10 +476,9 @@ struct Vertex
 	glm::vec3 pos;
 	glm::vec3 color;
 	glm::vec2 texCoord;
-	static VertexBindingDescription getVertexBindingDescription(uint32_t binding)
+	static VertexBindingDescription getVertexBindingDescription()
 	{
 		return {
-			binding,
 			sizeof(Vertex),
 			0,
 		};
@@ -428,6 +509,48 @@ struct Vertex
 	static uint32_t getLocationsNum()
 	{
 		return 3;
+	}
+};
+
+struct InstanceAttribute
+{
+	glm::mat4 translation;
+	static VertexBindingDescription getVertexBindingDescription()
+	{
+		return {sizeof(InstanceAttribute), 1};
+	}
+	static std::vector<VertexAttributeDescription> getVertexAttributeDescription(uint32_t startLocation, uint32_t binding)
+	{
+		return {
+			{startLocation + 0,
+			 binding,
+			 4,
+			 DATA_TYPE_FLOAT,
+			 false,
+			 0},
+			{startLocation + 1,
+			 binding,
+			 4,
+			 DATA_TYPE_FLOAT,
+			 false,
+			 16},
+			{startLocation + 2,
+			 binding,
+			 4,
+			 DATA_TYPE_FLOAT,
+			 false,
+			 32},
+			{startLocation + 3,
+			 binding,
+			 4,
+			 DATA_TYPE_FLOAT,
+			 false,
+			 48},
+		};
+	}
+	static uint32_t getLocationCount()
+	{
+		return 4;
 	}
 };
 
@@ -467,16 +590,21 @@ void createVertexArray(const VertexInputStateCreateInfo &vertexInputDescription,
 					   const std::vector<BufferHandle> &vertexBuffers,
 					   const BufferHandle indexBuffer,
 					   VertexArrayHandle *pVertexArray);
+void createVertexArray2(const VertexInputStateCreateInfo &vertexInputStateCreateInfo, VertexArrayHandle &vao);
 
-GLenum findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings, ImageType imageType, bool multisample, GLenum format);
+ImageTiling findSupportedTilingType(const std::vector<ImageTiling> &candidateTilings, ImageType imageType, bool multisample, GLenum format);
+
+void createMemory(MemoryHandle& memory);
 
 void createImage(const ImageCreateInfo &createInfo, ImageHandle *pImage);
 
-void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, ImageHandle *pImageViewHandle);
+void createImage2(const ImageCreateInfo &createInfo, ImageHandle &image, const MemoryHandle &memory);
+
+void createImageView(const ImageViewCreateInfo &createInfo, bool multisample, ImageViewHandle *pImageViewHandle);
 
 void updateImageSubData(ImageHandle image, ImageType imageType, const ImageSubData &imageSubData);
 
-void setImageSampler(const SamplerCreateInfo &createInfo, ImageHandle image, ImageViewType imageViewType, bool multisample = false);
+void setImageSampler(const SamplerCreateInfo &createInfo, ImageViewHandle image, ImageViewType imageViewType, bool multisample = false);
 
 void createDescriptorSetLayout(const DescriptorSetLayoutCreateInfo &createInfo, DescriptorSetLayout &outSetLayout);
 

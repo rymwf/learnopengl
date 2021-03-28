@@ -1,4 +1,7 @@
-#version 450
+#version 330
+#extension all:warn
+//#extension GL_ARB_explicit_attrib_location:enable 
+
 layout(location = 0) in vec3 inPos;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec2 inTexCoord;

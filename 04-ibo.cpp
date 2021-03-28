@@ -13,8 +13,8 @@ constexpr GLuint WIDTH = 800, HEIGHT = 600;
 
 GLint glVersion{0}; //set glversion,such as 33 mean use version 33 , if 0, use latest
 
-constexpr char *vertFile = SHADER_PATH "03.vert";
-constexpr char *fragFile = SHADER_PATH "03.frag";
+const char *vertFile = SHADER_PATH "03.vert";
+const char *fragFile = SHADER_PATH "03.frag";
 
 std::vector<Vertex> vertices{
 	{{-0.5, -0.5, 0}, {1, 0, 0}},
@@ -71,8 +71,13 @@ class Hello
 	}
 	void initOpengl()
 	{
-		if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(reinterpret_cast<uintptr_t>(glfwGetProcAddress))))
-			throw std::runtime_error("failed to load glad");
+		GLenum err = glewInit();
+		if (GLEW_OK != err)
+		{
+			/* Problem: glewInit failed, something is seriously wrong. */
+			fprintf(stderr, "Error: %s\n", glewGetErrorString(err));
+			THROW("failed to init glew");
+		}
 
 		listGLInfo();
 
@@ -174,7 +179,7 @@ class Hello
 		//#endif
 		//		}
 		//5
-		if (GLVersion.major * 10 + GLVersion.minor >= 46)
+		if (GLEW_VERSION_4_6)
 		{
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
 			glBindBuffer(GL_PARAMETER_BUFFER, drawIndexedIndirectCmdCountBuffer);
@@ -214,7 +219,7 @@ class Hello
 
 	void createTestProgram()
 	{
-		if (GLVersion.major * 10 + GLVersion.minor > 45 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
+		if (GLEW_VERSION_4_6 && isSupportShaderBinaryFormat(SHADER_BINARY_FORMAT_SPIR_V))
 		{
 			auto vertCode = readFile((std::string(vertFile) + ".spv").c_str());
 			auto fragCode = readFile((std::string(fragFile) + ".spv").c_str());
@@ -262,7 +267,7 @@ class Hello
 	void createVAO()
 	{
 		std::vector<VertexBindingDescription> bindingDescriptions{
-			Vertex::getVertexBindingDescription(0)};
+			Vertex::getVertexBindingDescription()};
 
 		auto attributeDescriptions0 = Vertex::getVertexAttributeDescription(0, 0);
 		std::vector<VertexAttributeDescription> attributeDescriptions;
