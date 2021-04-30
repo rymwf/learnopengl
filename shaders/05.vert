@@ -12,8 +12,11 @@ layout(binding = 1) uniform UBO_MVP {
   mat4 P;
 };
 
+layout(location =0) uniform vec3 colorFactor;
+
 void main() {
   gl_Position = P * V * M * vec4(inPos, 1);
   //gl_Position =  vec4(inPos, 0, 1);
-  vs_out.color = inColor;
+  vs_out.color = inColor*colorFactor;
+  //vs_out.color = inColor;
 }

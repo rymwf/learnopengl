@@ -48,7 +48,7 @@ std::vector<Vertex> vertices{
 	{{-0.5, 0.5, 0}, {0, 0, 1}, {0, 0}},
 	{{0.5, 0.5, 0}, {1, 1, 0}, {1, 0}},
 };
-std::vector<uint32_t> indices{
+std::vector<uint16_t> indices{
 	0, 1, 2, 2, 1, 3};
 
 std::vector<DrawIndirectCommand> drawIndirectCmds{{4, 1, 0, 0}};
@@ -256,14 +256,14 @@ class Hello
 		{
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
 			glBindBuffer(GL_PARAMETER_BUFFER, drawIndexedIndirectCmdCountBuffer);
-			glMultiDrawElementsIndirectCount(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
+			glMultiDrawElementsIndirectCount(GL_TRIANGLES, GL_UNSIGNED_SHORT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
 		}
 		else
 		{
 #ifdef GL_ARB_indirect_parameters
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, drawIndexedIndirectCmdBuffer);
 			glBindBuffer(GL_PARAMETER_BUFFER_ARB, drawIndexedIndirectCmdCountBuffer);
-			glMultiDrawElementsIndirectCountARB(GL_TRIANGLE_STRIP, GL_UNSIGNED_INT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
+			glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, NULL, 0, drawIndexedIndirectCmds.size(), sizeof(DrawIndexedIndirectCommand));
 #endif
 		}
 		//glFinish();
@@ -457,8 +457,6 @@ class Hello
 			glGenerateMipmap(target);
 			glBindTexture(target, 0);
 		}
-
-		glFinish();
 
 		ImageViewCreateInfo imageViewCreateInfo{
 			testImage,

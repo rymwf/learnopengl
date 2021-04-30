@@ -344,6 +344,8 @@ class Hello
 		void *data = glMapBufferRange(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), GL_MAP_WRITE_BIT);
 		memcpy(data, &uboMVP.M, sizeof(uboMVP.M));
 		glUnmapBuffer(GL_UNIFORM_BUFFER);
+
+		glUniform3f(0, 1, 0, 0);
 	}
 
 public:
